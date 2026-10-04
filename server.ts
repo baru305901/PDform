@@ -33,35 +33,53 @@ app.post('/api/summarize-income', async (req, res) => {
       return res.status(400).json({ error: 'Raw notes are required' });
     }
 
-    const systemInstruction = `You are an expert Credit Appraisal & Case Underwriting Documentation Specialist for NBFCs and Retail Lending (such as SK Finance).
-Your task is to transform raw, informal field notes—written or dictated in WhatsApp-style Hinglish, colloquial Hindi, Marwadi dialect, or mixed regional phrasing—into a clean, formal, professional English Credit Income Assessment paragraph for the "Monthly Income / Family Income" section of a Personal Discussion (PD) Visit Report.
+    const systemInstruction = `You are a Senior Credit Officer at an NBFC. Take these raw field notes and convert them into a professional, formal English paragraph assessing the customer's monthly income, cash flow, and disposable surplus. Output ONLY clean English. Do not echo the original text.
 
-STRICT RULES:
-1. 100% formal, polished business English. Zero Hindi or Marwadi words (e.g. translate "galla" to "daily cash counter sales", "parchi / udhaar" to "informal credit receivables / rolling credit", "kharcha" to "operating expenses / overheads", "kamaai / bachat" to "net disposable earnings / surplus").
-2. Retain all specific numbers, amounts, rates, volume counts, and margins exactly. Calculate monthly gross and net approximations where daily figures are given.
-3. Write in an objective, professional tone suitable for Credit Assessment Memos (CAM sheets).
-4. Output ONLY the concise, formatted assessment text ready to be pasted directly into the report box. Do not output conversational preamble, greetings, or meta-comments.`;
+CRITICAL RULES:
+1. Strict 100% formal, polished banking English. Zero Hindi, Marwadi, or colloquial slang words.
+2. Translate local terms:
+   - "galla" -> "daily cash counter collection"
+   - "udhaar / parchi" -> "informal rolling credit / ledger receivables"
+   - "kharcha" -> "operational overheads / recurring expenses"
+   - "bachat / kamaai" -> "net disposable income / surplus"
+3. Preserve all exact figures, monetary amounts, percentages, candidate counts, and tenures. Calculate monthly projections where daily values are provided.
+4. Output ONLY the concise, formal credit assessment paragraph. No conversational intro, no outro, no markdown preamble.`;
 
     const prompt = `Applicant: ${customerName || 'Borrower'}
 Business: ${businessName || 'Trading/Services'}
-Raw Field Notes/Dictation:
+Raw Field Notes:
 "${rawNotes}"
 
-Generate the formal Monthly Income / Family Income credit observation text.`;
+Convert into a formal English Monthly Income & Cash Flow Assessment paragraph:`;
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash',
-      contents: prompt,
-      config: {
-        systemInstruction,
-        temperature: 0.2,
-      },
-    });
+    const candidateModels = ['gemini-3.8-flash', 'gemini-3.1-flash-lite', 'gemini-flash-latest'];
+    let summary = '';
+    let lastError: any = null;
 
-    const summary = response.text?.trim() || '';
+    for (const model of candidateModels) {
+      try {
+        const response = await ai.models.generateContent({
+          model,
+          contents: prompt,
+          config: {
+            systemInstruction,
+            temperature: 0.2,
+          },
+        });
+
+        summary = response.text?.trim() || '';
+        if (summary) {
+          break;
+        }
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Model ${model} call failed:`, err?.message || err);
+      }
+    }
 
     if (!summary) {
-      return res.status(500).json({ error: 'Failed to generate summary' });
+      const errMsg = lastError?.message || 'Failed to generate summary from Gemini';
+      return res.status(500).json({ error: errMsg });
     }
 
     res.json({ summary });

@@ -22,51 +22,40 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [rawText, setRawText] = useState('');
-  const [interimText, setInterimText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const recognitionRef = useRef<any>(null);
 
-  // Initialize Web Speech API
+  // Initialize Web Speech API with continuous=false and interimResults=false to stop duplication
   useEffect(() => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (SpeechRecognition) {
       const recognition = new SpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
+      recognition.continuous = false; // Prevent repeated overlapping loops
+      recognition.interimResults = false; // Only accept final, verified speech
       recognition.lang = 'hi-IN'; // Optimized for Indian Hindi / Hinglish / Marwadi accent
 
       recognition.onresult = (event: any) => {
-        let interim = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          const transcriptPart = event.results[i][0]?.transcript || '';
-          if (event.results[i].isFinal) {
-            const cleanFinal = transcriptPart.trim();
-            if (cleanFinal) {
-              setRawText((prev) => (prev ? `${prev} ${cleanFinal}` : cleanFinal));
-            }
-          } else {
-            interim += transcriptPart;
-          }
+        const transcript = event.results[0][0]?.transcript?.trim();
+        if (transcript) {
+          setRawText((prev) => (prev ? prev + ' ' : '') + transcript);
+          setStatusMessage(`Captured: "${transcript}"`);
         }
-        setInterimText(interim);
       };
 
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
         setIsListening(false);
-        setInterimText('');
         if (event.error === 'not-allowed') {
           setStatusMessage('Microphone access blocked. Please allow mic in browser settings.');
         } else {
-          setStatusMessage(`Mic notice (${event.error}). Please type below.`);
+          setStatusMessage(`Mic notice (${event.error}). Ready to speak.`);
         }
       };
 
       recognition.onend = () => {
         setIsListening(false);
-        setInterimText('');
       };
 
       recognitionRef.current = recognition;
@@ -82,10 +71,6 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
-      if (interimText.trim()) {
-        setRawText((prev) => (prev ? `${prev} ${interimText.trim()}` : interimText.trim()));
-      }
-      setInterimText('');
       setStatusMessage('Voice dictation paused');
     } else {
       try {
@@ -94,7 +79,7 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
         }
         recognitionRef.current.start();
         setIsListening(true);
-        setStatusMessage('Listening in Hindi/Hinglish... Speak clearly.');
+        setStatusMessage('Listening (hi-IN)... Speak your sentence now.');
       } catch (e) {
         console.error(e);
       }
@@ -102,15 +87,15 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
   };
 
   const handleGenerateSummary = async () => {
-    const textToSummarize = (rawText + (interimText ? ` ${interimText}` : '')).trim();
+    const textToSummarize = rawText.trim();
 
     if (!textToSummarize) {
-      setStatusMessage('Please speak or type raw income notes first.');
+      alert('Please speak or type raw field notes before generating summary.');
       return;
     }
 
     setIsLoading(true);
-    setStatusMessage('Converting to banking-standard English income summary...');
+    setStatusMessage('Connecting to Gemini AI to generate English credit summary...');
 
     try {
       const response = await fetch('/api/summarize-income', {
@@ -123,49 +108,27 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
         })
       });
 
-      if (!response.ok) {
-        throw new Error(`Server returned ${response.status}`);
+      const data = await response.json().catch(() => null);
+
+      if (!response.ok || !data?.summary) {
+        throw new Error(data?.error || `Server error (${response.status})`);
       }
 
-      const data = await response.json();
-      if (data.summary) {
-        onApplySummary(data.summary);
-        setStatusMessage('Summary populated into Monthly Income details!');
-        setTimeout(() => {
-          setStatusMessage(null);
-          setIsOpen(false);
-        }, 1500);
-      } else {
-        throw new Error('No summary returned');
-      }
-    } catch (err: any) {
-      console.warn('AI summary server error, using client-side rule processor:', err);
-      // Clean fallback if backend route is unavailable
-      const fallback = processFallbackSummary(textToSummarize, businessName);
-      onApplySummary(fallback);
-      setStatusMessage('Summary populated into report!');
+      onApplySummary(data.summary);
+      setStatusMessage('✓ English Credit Summary generated & populated!');
       setTimeout(() => {
         setStatusMessage(null);
         setIsOpen(false);
       }, 1500);
+    } catch (err: any) {
+      console.error('AI summary error:', err);
+      const errMsg = err?.message || 'Failed to generate AI English summary.';
+      setStatusMessage(`Error: ${errMsg}`);
+      // Show alert error instead of dumping raw text
+      alert(`AI English Summary Error: ${errMsg}\n\nPlease check your input or connection and try again.`);
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Rule-based fallback if offline or network failure
-  const processFallbackSummary = (text: string, bName: string) => {
-    let clean = text
-      .replace(/galla/gi, 'daily cash counter collection')
-      .replace(/udhaar/gi, 'rolling credit sales')
-      .replace(/parchi/gi, 'ledger slips')
-      .replace(/kharcha/gi, 'operational expenses')
-      .replace(/kamaai/gi, 'net earnings')
-      .replace(/bachat/gi, 'net surplus')
-      .replace(/bolya|keh rha tha/gi, 'reported during visit')
-      .replace(/koni/gi, 'none');
-
-    return `Assessed cash flows for ${bName || 'commercial establishment'}: ${clean}. Monthly counter sales and operational margins verified on site. Cash flows remain adequately stable to service proposed debt obligations.`;
   };
 
   const handleLoadSampleNotes = (type: 'galla' | 'fees') => {
@@ -247,10 +210,7 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
             {rawText && (
               <button
                 type="button"
-                onClick={() => {
-                  setRawText('');
-                  setInterimText('');
-                }}
+                onClick={() => setRawText('')}
                 className="absolute right-2 top-2 text-slate-400 hover:text-white text-[10px] p-0.5"
                 title="Clear input"
               >
@@ -258,14 +218,6 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
               </button>
             )}
           </div>
-
-          {/* Real-time interim voice preview without repeating words */}
-          {interimText && (
-            <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-950/40 border border-amber-500/30 rounded text-[11px] text-amber-200">
-              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-              <span className="italic truncate">Live voice: "{interimText}"</span>
-            </div>
-          )}
 
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-1.5 text-[10px] text-slate-400 truncate max-w-[280px]">
