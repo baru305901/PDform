@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Mic, MicOff, Sparkles, Loader2, RotateCcw, Check, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mic, MicOff, Sparkles, Loader2, RotateCcw, ChevronDown, ChevronUp, Key } from 'lucide-react';
+import { GoogleGenAI } from '@google/genai';
 
 interface IncomeDictationAssistantProps {
   customerName: string;
@@ -25,7 +26,18 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [customKey, setCustomKey] = useState(() => localStorage.getItem('user_gemini_api_key') || '');
   const recognitionRef = useRef<any>(null);
+
+  const getEffectiveApiKey = (): string => {
+    return (
+      customKey.trim() ||
+      (typeof process !== 'undefined' && process.env && process.env.GEMINI_API_KEY) ||
+      localStorage.getItem('user_gemini_api_key') ||
+      ''
+    );
+  };
 
   // Initialize Web Speech API with continuous=false and interimResults=false to stop duplication
   useEffect(() => {
@@ -86,6 +98,18 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
     }
   };
 
+  const handleSaveApiKey = () => {
+    if (customKey.trim()) {
+      localStorage.setItem('user_gemini_api_key', customKey.trim());
+      setStatusMessage('API Key saved to browser storage.');
+      setShowKeyInput(false);
+    } else {
+      localStorage.removeItem('user_gemini_api_key');
+      setStatusMessage('Custom API Key cleared.');
+      setShowKeyInput(false);
+    }
+  };
+
   const handleGenerateSummary = async () => {
     const textToSummarize = rawText.trim();
 
@@ -94,38 +118,74 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
       return;
     }
 
+    let activeKey = getEffectiveApiKey();
+
+    if (!activeKey) {
+      const userEntered = prompt(
+        'Please enter your Google Gemini API key to enable standalone client-side summarization:\n(Key will be stored locally in your browser)'
+      );
+      if (userEntered && userEntered.trim()) {
+        activeKey = userEntered.trim();
+        setCustomKey(activeKey);
+        localStorage.setItem('user_gemini_api_key', activeKey);
+      } else {
+        alert('A valid Gemini API key is required to generate the AI summary.');
+        return;
+      }
+    }
+
     setIsLoading(true);
-    setStatusMessage('Connecting to Gemini AI to generate English credit summary...');
+    setStatusMessage('Generating professional English credit summary with Gemini...');
 
     try {
-      const response = await fetch('/api/summarize-income', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rawNotes: textToSummarize,
-          customerName,
-          businessName
-        })
+      const ai = new GoogleGenAI({
+        apiKey: activeKey,
       });
 
-      const data = await response.json().catch(() => null);
+      const systemInstruction = `You are a Senior Credit Officer at an NBFC. Take these raw field notes (in Hindi, Marwadi, or Hinglish) and convert them into a professional, formal English paragraph assessing the customer's monthly income, cash flow, and disposable surplus. Output ONLY clean formal English. Preserve all numbers and calculations.`;
 
-      if (!response.ok || !data?.summary) {
-        throw new Error(data?.error || `Server error (${response.status})`);
+      const prompt = `Applicant: ${customerName || 'Borrower'} | Business: ${businessName || 'Trading/Services'} | Raw Field Notes: "${textToSummarize}"`;
+
+      const candidateModels = ['gemini-flash-latest', 'gemini-3.8-flash', 'gemini-3.1-flash-lite'];
+      let summary = '';
+      let lastError: any = null;
+
+      for (const model of candidateModels) {
+        try {
+          const response = await ai.models.generateContent({
+            model,
+            contents: prompt,
+            config: {
+              systemInstruction,
+              temperature: 0.2,
+            },
+          });
+
+          summary = response.text?.trim() || '';
+          if (summary) break;
+        } catch (err: any) {
+          lastError = err;
+          console.warn(`Model ${model} attempt failed:`, err?.message || err);
+        }
       }
 
-      onApplySummary(data.summary);
+      if (!summary) {
+        throw new Error(lastError?.message || 'Failed to receive summary from Gemini API');
+      }
+
+      // Populate formal English summary strictly from Gemini into report
+      onApplySummary(summary);
       setStatusMessage('✓ English Credit Summary generated & populated!');
       setTimeout(() => {
         setStatusMessage(null);
         setIsOpen(false);
       }, 1500);
     } catch (err: any) {
-      console.error('AI summary error:', err);
+      console.error('Client-side AI summary error:', err);
       const errMsg = err?.message || 'Failed to generate AI English summary.';
       setStatusMessage(`Error: ${errMsg}`);
       // Show alert error instead of dumping raw text
-      alert(`AI English Summary Error: ${errMsg}\n\nPlease check your input or connection and try again.`);
+      alert(`AI English Summary Error: ${errMsg}\n\nPlease verify your Gemini API key and internet connection, then try again.`);
     } finally {
       setIsLoading(false);
     }
@@ -151,6 +211,14 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
         <div className="flex items-center gap-1">
           <button
             type="button"
+            onClick={() => setShowKeyInput(!showKeyInput)}
+            className="p-1 text-slate-400 hover:text-amber-300 rounded"
+            title="Configure / View Gemini API Key"
+          >
+            <Key className="w-2.5 h-2.5" />
+          </button>
+          <button
+            type="button"
             onClick={toggleListening}
             className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-1 transition ${
               isListening
@@ -172,6 +240,27 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
           </button>
         </div>
       </div>
+
+      {/* API Key Modal / Drawer */}
+      {showKeyInput && (
+        <div className="bg-slate-950 border-x border-b border-amber-600/40 p-2 text-xs text-slate-200 flex items-center gap-2">
+          <Key className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+          <input
+            type="password"
+            value={customKey}
+            onChange={(e) => setCustomKey(e.target.value)}
+            placeholder="Gemini API Key (leave blank to use system env)"
+            className="flex-1 bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-white placeholder:text-slate-500"
+          />
+          <button
+            type="button"
+            onClick={handleSaveApiKey}
+            className="px-2 py-1 bg-amber-600 hover:bg-amber-500 text-white text-[11px] font-bold rounded"
+          >
+            Save Key
+          </button>
+        </div>
+      )}
 
       {/* Expanded Dictation Panel */}
       {isOpen && (
@@ -224,7 +313,7 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
               {isListening && (
                 <span className="inline-block w-2 h-2 rounded-full bg-red-500 animate-ping" />
               )}
-              <span className="truncate">{statusMessage || 'Web Speech (hi-IN) enabled'}</span>
+              <span className="truncate">{statusMessage || 'Web Speech (hi-IN) & Client Gemini enabled'}</span>
             </div>
 
             <div className="flex items-center gap-1.5">
