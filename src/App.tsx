@@ -35,6 +35,51 @@ export default function App() {
   const [viewMode, setViewMode] = useState<'continuous' | 'p1' | 'p2' | 'p3' | 'split'>('continuous');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  // Touch gesture state for pinch-to-zoom
+  const pinchRef = React.useRef<{
+    initialDist: number;
+    initialZoom: number;
+    isPinching: boolean;
+  }>({
+    initialDist: 0,
+    initialZoom: 1.0,
+    isPinching: false
+  });
+
+  const handleTouchStart = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const dist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      pinchRef.current = {
+        initialDist: dist,
+        initialZoom: zoom,
+        isPinching: true
+      };
+    }
+  };
+
+  const handleTouchMove = (e: React.TouchEvent<HTMLDivElement>) => {
+    if (e.touches.length === 2 && pinchRef.current.isPinching && pinchRef.current.initialDist > 0) {
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const currentDist = Math.hypot(touch1.clientX - touch2.clientX, touch1.clientY - touch2.clientY);
+      const factor = currentDist / pinchRef.current.initialDist;
+      // Allow smooth scale between 50% (0.50) and 250% (2.50)
+      const targetZoom = Number(
+        Math.min(2.5, Math.max(0.5, pinchRef.current.initialZoom * factor)).toFixed(2)
+      );
+      setZoom(targetZoom);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    if (pinchRef.current.isPinching) {
+      pinchRef.current.isPinching = false;
+      pinchRef.current.initialDist = 0;
+    }
+  };
+
   // Auto-save to LocalStorage
   useEffect(() => {
     try {
@@ -242,34 +287,43 @@ export default function App() {
         )}
 
         {/* Paper Document Canvas Outer Scrollable Container */}
-        <div className="flex-1 min-w-0 w-full max-w-full overflow-x-auto p-2 sm:p-4 mobile-sheet-viewport touch-pan-x flex flex-col items-center">
+        <div
+          className="flex-1 min-w-0 w-full max-w-full overflow-x-auto p-2 sm:p-4 mobile-sheet-viewport flex flex-col items-center"
+          style={{ touchAction: 'pan-x pan-y pinch-zoom' }}
+          onTouchStart={handleTouchStart}
+          onTouchMove={handleTouchMove}
+          onTouchEnd={handleTouchEnd}
+          onTouchCancel={handleTouchEnd}
+        >
           {/* Mobile quick scroll/fit hint bar */}
           <div className="no-print sm:hidden w-full max-w-[210mm] flex items-center justify-between bg-slate-800/90 border border-slate-700/80 rounded-lg px-3 py-1.5 mb-2 text-[11px] text-slate-300 shadow-sm">
             <span>
-              {zoom < 0.95 ? `Fit to Screen (${Math.round(zoom * 100)}%)` : '100% Original Size (Swipe to pan)'}
+              Scale: <strong className="text-white font-mono">{Math.round(zoom * 100)}%</strong> · Pinch with 2 fingers to zoom
             </span>
             <button
               type="button"
               onClick={handleFitToWidth}
               className="text-sky-300 hover:text-white font-semibold underline ml-2"
             >
-              {zoom < 0.95 ? 'View 100%' : 'Fit Screen'}
+              {zoom < 0.95 ? '100% Size' : 'Fit Screen'}
             </button>
           </div>
 
           <div
-            className="flex flex-col items-center justify-start transition-all duration-150"
+            className="flex flex-col items-center justify-start transition-size duration-75"
             style={{
-              width: zoom < 1.0 ? `${794 * zoom}px` : undefined,
-              maxWidth: '100%'
+              width: `${Math.round(794 * zoom)}px`,
+              minWidth: `${Math.round(794 * zoom)}px`,
+              touchAction: 'pan-x pan-y pinch-zoom'
             }}
           >
             <main
-              className="flex flex-col items-center justify-start py-2 sm:py-4 transition-transform duration-150"
+              className="flex flex-col items-center justify-start py-2 sm:py-4 transition-transform duration-75"
               style={{
                 transform: zoom !== 1.0 ? `scale(${zoom})` : undefined,
                 transformOrigin: 'top center',
-                width: '210mm'
+                width: '210mm',
+                touchAction: 'pan-x pan-y pinch-zoom'
               }}
             >
           {/* Continuous Mode (All 3 Pages) */}
