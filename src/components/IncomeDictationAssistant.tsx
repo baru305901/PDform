@@ -22,6 +22,7 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [rawText, setRawText] = useState('');
+  const [interimText, setInterimText] = useState('');
   const [isListening, setIsListening] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
@@ -37,27 +38,35 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
       recognition.lang = 'hi-IN'; // Optimized for Indian Hindi / Hinglish / Marwadi accent
 
       recognition.onresult = (event: any) => {
-        let transcript = '';
-        for (let i = event.resultIndex; i < event.results.length; i++) {
-          transcript += event.results[i][0].transcript;
+        let interim = '';
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          const transcriptPart = event.results[i][0]?.transcript || '';
+          if (event.results[i].isFinal) {
+            const cleanFinal = transcriptPart.trim();
+            if (cleanFinal) {
+              setRawText((prev) => (prev ? `${prev} ${cleanFinal}` : cleanFinal));
+            }
+          } else {
+            interim += transcriptPart;
+          }
         }
-        if (transcript.trim()) {
-          setRawText((prev) => (prev ? `${prev} ${transcript.trim()}` : transcript.trim()));
-        }
+        setInterimText(interim);
       };
 
       recognition.onerror = (event: any) => {
         console.warn('Speech recognition error:', event.error);
         setIsListening(false);
+        setInterimText('');
         if (event.error === 'not-allowed') {
           setStatusMessage('Microphone access blocked. Please allow mic in browser settings.');
         } else {
-          setStatusMessage(`Mic error (${event.error}). Please type below.`);
+          setStatusMessage(`Mic notice (${event.error}). Please type below.`);
         }
       };
 
       recognition.onend = () => {
         setIsListening(false);
+        setInterimText('');
       };
 
       recognitionRef.current = recognition;
@@ -73,12 +82,19 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
     if (isListening) {
       recognitionRef.current.stop();
       setIsListening(false);
+      if (interimText.trim()) {
+        setRawText((prev) => (prev ? `${prev} ${interimText.trim()}` : interimText.trim()));
+      }
+      setInterimText('');
       setStatusMessage('Voice dictation paused');
     } else {
       try {
+        if (!isOpen) {
+          setIsOpen(true);
+        }
         recognitionRef.current.start();
         setIsListening(true);
-        setStatusMessage('Listening in Hindi/Hinglish... Speak your notes clearly.');
+        setStatusMessage('Listening in Hindi/Hinglish... Speak clearly.');
       } catch (e) {
         console.error(e);
       }
@@ -86,7 +102,9 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
   };
 
   const handleGenerateSummary = async () => {
-    if (!rawText.trim()) {
+    const textToSummarize = (rawText + (interimText ? ` ${interimText}` : '')).trim();
+
+    if (!textToSummarize) {
       setStatusMessage('Please speak or type raw income notes first.');
       return;
     }
@@ -99,7 +117,7 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          rawNotes: rawText.trim(),
+          rawNotes: textToSummarize,
           customerName,
           businessName
         })
@@ -123,7 +141,7 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
     } catch (err: any) {
       console.warn('AI summary server error, using client-side rule processor:', err);
       // Clean fallback if backend route is unavailable
-      const fallback = processFallbackSummary(rawText, businessName);
+      const fallback = processFallbackSummary(textToSummarize, businessName);
       onApplySummary(fallback);
       setStatusMessage('Summary populated into report!');
       setTimeout(() => {
@@ -229,7 +247,10 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
             {rawText && (
               <button
                 type="button"
-                onClick={() => setRawText('')}
+                onClick={() => {
+                  setRawText('');
+                  setInterimText('');
+                }}
                 className="absolute right-2 top-2 text-slate-400 hover:text-white text-[10px] p-0.5"
                 title="Clear input"
               >
@@ -237,6 +258,14 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
               </button>
             )}
           </div>
+
+          {/* Real-time interim voice preview without repeating words */}
+          {interimText && (
+            <div className="flex items-center gap-1.5 px-2 py-1 bg-amber-950/40 border border-amber-500/30 rounded text-[11px] text-amber-200">
+              <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
+              <span className="italic truncate">Live voice: "{interimText}"</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between pt-1">
             <div className="flex items-center gap-1.5 text-[10px] text-slate-400 truncate max-w-[280px]">
