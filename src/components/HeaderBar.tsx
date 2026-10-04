@@ -24,6 +24,7 @@ interface HeaderBarProps {
   onImportJson: (file: File) => void;
   zoom: number;
   setZoom: (z: number) => void;
+  onFitToWidth?: () => void;
   fontMode: 'script' | 'formal';
   setFontMode: (m: 'script' | 'formal') => void;
   viewMode: 'continuous' | 'p1' | 'p2' | 'p3' | 'split';
@@ -40,6 +41,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onImportJson,
   zoom,
   setZoom,
+  onFitToWidth,
   fontMode,
   setFontMode,
   viewMode,
@@ -95,6 +97,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
           {/* Quick preset selector on mobile */}
           <div className="flex md:hidden items-center gap-1.5">
+            {onFitToWidth && (
+              <button
+                type="button"
+                onClick={onFitToWidth}
+                className="text-xs bg-slate-800 text-sky-300 hover:text-white px-2 py-1 rounded font-medium border border-sky-500/30 transition active:scale-95"
+                title="Fit sheet to phone screen width"
+              >
+                {zoom < 0.95 ? '100%' : 'Fit'}
+              </button>
+            )}
             <button
               onClick={() => onLoadSample('kulwant')}
               className="text-xs bg-slate-800 text-amber-300 px-2 py-1 rounded font-medium border border-amber-500/30"
@@ -260,6 +272,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             >
               <Maximize2 className="w-3 h-3" />
             </button>
+            {onFitToWidth && (
+              <button
+                type="button"
+                onClick={onFitToWidth}
+                className="px-1.5 py-0.5 text-[10px] text-sky-400 hover:text-white font-medium transition rounded ml-0.5 border-l border-slate-700"
+                title="Fit sheet to screen width"
+              >
+                Fit
+              </button>
+            )}
           </div>
 
           <div className="h-5 w-px bg-slate-700 mx-0.5 hidden sm:block"></div>

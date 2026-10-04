@@ -16,18 +16,29 @@ body {
 /* Strict A4 Paper Dimensions (210mm x 297mm) */
 .a4-page {
   width: 210mm;
+  min-width: 210mm;
+  max-width: 210mm;
   height: 297mm;
   max-height: 297mm;
   min-height: 297mm;
   padding: 10mm 12mm;
-  margin: 20px auto;
+  margin: 16px auto;
   background: #ffffff;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
   position: relative;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   transition: transform 0.2s ease-in-out;
+}
+
+/* Mobile responsive scrollable sheet container */
+.mobile-sheet-viewport {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* Inner bordered sheet matching physical document frame */
@@ -150,6 +161,11 @@ body {
   margin: 0;
 }
 
+select.form-input {
+  cursor: pointer;
+  padding-right: 14px;
+}
+
 @media print {
   html, body {
     width: 210mm !important;
@@ -162,8 +178,16 @@ body {
   .no-print {
     display: none !important;
   }
+  .mobile-sheet-viewport {
+    overflow: visible !important;
+    width: 210mm !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
   .a4-page {
     width: 210mm !important;
+    min-width: 210mm !important;
+    max-width: 210mm !important;
     height: 297mm !important;
     max-height: 297mm !important;
     min-height: 297mm !important;
@@ -176,6 +200,7 @@ body {
     break-inside: avoid !important;
     overflow: hidden !important;
     transform: none !important;
+    flex-shrink: 0 !important;
   }
   .a4-page:last-child {
     page-break-after: auto !important;
@@ -184,9 +209,12 @@ body {
   .hole-punch {
     display: none !important;
   }
-  .form-input, .form-textarea {
+  .form-input, .form-textarea, select.form-input {
     background: transparent !important;
     outline: none !important;
     border-color: transparent !important;
+    -webkit-appearance: none !important;
+    -moz-appearance: none !important;
+    appearance: none !important;
   }
 }

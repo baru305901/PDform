@@ -14,7 +14,7 @@ import { FormEditorSidebar } from './components/FormEditorSidebar';
 import { exportToExcel, exportToWord, exportToJson } from './utils/exportUtils';
 import { CheckCircle, AlertCircle, Info, ChevronRight } from 'lucide-react';
 
-const STORAGE_KEY = 'sk_finance_pd_report_state_v1';
+const STORAGE_KEY = 'sk_finance_pd_report_state_v2';
 
 export default function App() {
   // Load saved state or default to sampleKulwantSingh
@@ -149,6 +149,31 @@ export default function App() {
     reader.readAsText(file);
   };
 
+  // Toggle responsive fit-to-screen scale on mobile or desktop
+  const handleFitToWidth = () => {
+    const viewportWidth = window.innerWidth;
+    // 210mm = ~794px at standard 96 DPI
+    if (viewportWidth < 820) {
+      if (zoom < 0.95) {
+        setZoom(1.0);
+        showToast('Reset to 100% full view (swipe to pan)');
+      } else {
+        const calculatedScale = Math.min(1.0, Math.max(0.35, (viewportWidth - 20) / 794));
+        setZoom(Number(calculatedScale.toFixed(2)));
+        showToast(`Fit to screen: ${Math.round(calculatedScale * 100)}%`);
+      }
+    } else {
+      if (zoom === 1.0) {
+        const calculatedScale = Math.min(1.0, Math.max(0.65, (viewportWidth - 48) / 794));
+        setZoom(Number(calculatedScale.toFixed(2)));
+        showToast(`Fit to screen: ${Math.round(calculatedScale * 100)}%`);
+      } else {
+        setZoom(1.0);
+        showToast('Reset to 100% view');
+      }
+    }
+  };
+
   // Quick stats calculation
   const totalFamilyCount = reportData.familyMembers.filter(
     (m) => m.name.trim() !== ''
@@ -166,6 +191,7 @@ export default function App() {
         onImportJson={handleImportJson}
         zoom={zoom}
         setZoom={setZoom}
+        onFitToWidth={handleFitToWidth}
         fontMode={fontMode}
         setFontMode={setFontMode}
         viewMode={viewMode}
@@ -209,20 +235,43 @@ export default function App() {
       </div>
 
       {/* Main Content Area */}
-      <div className="flex w-full justify-center">
+      <div className="flex w-full max-w-full justify-center overflow-x-hidden min-w-0">
         {/* Split Screen Sidebar Editor */}
         {viewMode === 'split' && (
           <FormEditorSidebar data={reportData} onChange={handleFieldChange} />
         )}
 
-        {/* Paper Document Canvas */}
-        <main
-          className="flex-1 flex flex-col items-center justify-start py-6 px-2 overflow-x-auto"
-          style={{
-            transform: zoom !== 1.0 ? `scale(${zoom})` : undefined,
-            transformOrigin: 'top center'
-          }}
-        >
+        {/* Paper Document Canvas Outer Scrollable Container */}
+        <div className="flex-1 min-w-0 w-full max-w-full overflow-x-auto p-2 sm:p-4 mobile-sheet-viewport touch-pan-x flex flex-col items-center">
+          {/* Mobile quick scroll/fit hint bar */}
+          <div className="no-print sm:hidden w-full max-w-[210mm] flex items-center justify-between bg-slate-800/90 border border-slate-700/80 rounded-lg px-3 py-1.5 mb-2 text-[11px] text-slate-300 shadow-sm">
+            <span>
+              {zoom < 0.95 ? `Fit to Screen (${Math.round(zoom * 100)}%)` : '100% Original Size (Swipe to pan)'}
+            </span>
+            <button
+              type="button"
+              onClick={handleFitToWidth}
+              className="text-sky-300 hover:text-white font-semibold underline ml-2"
+            >
+              {zoom < 0.95 ? 'View 100%' : 'Fit Screen'}
+            </button>
+          </div>
+
+          <div
+            className="flex flex-col items-center justify-start transition-all duration-150"
+            style={{
+              width: zoom < 1.0 ? `${794 * zoom}px` : undefined,
+              maxWidth: '100%'
+            }}
+          >
+            <main
+              className="flex flex-col items-center justify-start py-2 sm:py-4 transition-transform duration-150"
+              style={{
+                transform: zoom !== 1.0 ? `scale(${zoom})` : undefined,
+                transformOrigin: 'top center',
+                width: '210mm'
+              }}
+            >
           {/* Continuous Mode (All 3 Pages) */}
           {(viewMode === 'continuous' || viewMode === 'split') && (
             <div className="space-y-6">
@@ -308,6 +357,8 @@ export default function App() {
             </div>
           )}
         </main>
+          </div>
+        </div>
       </div>
 
       {/* Floating Notification Toast */}

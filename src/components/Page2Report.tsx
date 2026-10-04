@@ -134,13 +134,29 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
                   />
                 </td>
                 <td>
-                  <input
-                    type="text"
-                    className="form-input handwritten"
+                  <select
+                    className="form-input handwritten cursor-pointer bg-transparent"
                     value={member.relation}
                     onChange={(e) => onUpdateFamilyMember(index, 'relation', e.target.value)}
-                    placeholder={index === 0 ? 'Self' : 'Relation'}
-                  />
+                    style={{ width: '100%', height: '22px' }}
+                  >
+                    <option value="">-- Select --</option>
+                    <option value="Self">Self</option>
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Wife">Wife</option>
+                    <option value="Son">Son</option>
+                    <option value="Daughter">Daughter</option>
+                    <option value="Brother">Brother</option>
+                    <option value="Sister">Sister</option>
+                    <option value="Grandfather">Grandfather</option>
+                    <option value="Grandmother">Grandmother</option>
+                    <option value="Other">Other</option>
+                    {member.relation &&
+                      !['Self', 'Father', 'Mother', 'Wife', 'Son', 'Daughter', 'Brother', 'Sister', 'Grandfather', 'Grandmother', 'Other', ''].includes(member.relation) && (
+                        <option value={member.relation}>{member.relation}</option>
+                      )}
+                  </select>
                 </td>
                 <td className="relative">
                   <div className="flex items-center justify-between">

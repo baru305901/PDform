@@ -13,7 +13,7 @@ export function exportToExcel(data: PDReportData) {
       ['DATE OF VISIT', data.visitDate],
       ['VISIT LOCATION', data.visitLocation],
       ['CUSTOMER NAME', custName],
-      ['STABILITY & RESIDENCE TYPE', data.residenceType],
+      ['STABILITY & RESIDENCE TYPE', data.residenceStabilityNotes ? `${data.residenceType} - ${data.residenceStabilityNotes}` : data.residenceType],
       ['PROPERTY ADDRESS', data.propertyAddress],
       ['PERMANENT / CURRENT ADDRESS', data.permanentAddress],
       ['CONTACT NUMBERS (VERIFIED)', data.contactNumbers],
@@ -173,7 +173,7 @@ export function exportToWord(data: PDReportData) {
           </tr>
           <tr>
             <td><b>Stability & Residence type:</b></td>
-            <td colspan="3">${data.residenceType}</td>
+            <td colspan="3">${data.residenceType}${data.residenceStabilityNotes ? ` (${data.residenceStabilityNotes})` : ''}</td>
           </tr>
           <tr>
             <td><b>Property address:</b></td>

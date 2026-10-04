@@ -109,17 +109,32 @@ export const Page1Report: React.FC<Page1ReportProps> = ({ data, onChange }) => {
                 Stability & Residence type<br />
                 <span style={{ fontSize: '9px', fontWeight: 500 }}>(Own/Rented/Company Provided)</span>
               </td>
-              <td>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px' }}>
-                  <input
-                    type="text"
-                    value={data.residenceType}
-                    onChange={(e) => onChange('residenceType', e.target.value)}
-                    className="form-input handwritten font-semibold"
-                    style={{ width: '60%' }}
-                    placeholder="e.g. Self own / Rented"
-                  />
-                  <span style={{ fontSize: '10px', fontWeight: 700 }}>NA</span>
+              <td style={{ padding: '1px 3px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '4px' }}>
+                  {/* Left 50%: Dropdown */}
+                  <div style={{ width: '50%', borderRight: '1px solid #000', paddingRight: '4px' }}>
+                    <select
+                      value={data.residenceType || 'Self Owned'}
+                      onChange={(e) => onChange('residenceType', e.target.value)}
+                      className="form-input handwritten font-semibold cursor-pointer"
+                      style={{ width: '100%', background: 'transparent', height: '22px' }}
+                    >
+                      <option value="Self Owned">Self Owned</option>
+                      <option value="Rented">Rented</option>
+                      <option value="Company Provided">Company Provided</option>
+                    </select>
+                  </div>
+                  {/* Right 50%: Flexible text input for stability notes */}
+                  <div style={{ width: '50%', paddingLeft: '4px' }}>
+                    <input
+                      type="text"
+                      value={data.residenceStabilityNotes || ''}
+                      onChange={(e) => onChange('residenceStabilityNotes', e.target.value)}
+                      className="form-input handwritten"
+                      style={{ width: '100%' }}
+                      placeholder="Stay stability / years at address..."
+                    />
+                  </div>
                 </div>
               </td>
             </tr>

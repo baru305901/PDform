@@ -15,6 +15,7 @@ export interface PDReportData {
   // Borrower & Residence Details
   customerName: string;
   residenceType: string;
+  residenceStabilityNotes?: string;
   propertyAddress: string;
   permanentAddress: string;
   contactNumbers: string;

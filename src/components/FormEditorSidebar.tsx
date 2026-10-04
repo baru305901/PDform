@@ -139,19 +139,44 @@ export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({ data, onCh
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-slate-400 block mb-1">Residence Type</label>
+                <select
+                  value={data.residenceType || 'Self Owned'}
+                  onChange={(e) => onChange('residenceType', e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white focus:outline-blue-500"
+                >
+                  <option value="Self Owned">Self Owned</option>
+                  <option value="Rented">Rented</option>
+                  <option value="Company Provided">Company Provided</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-slate-400 block mb-1">Stability Notes / Vintage</label>
                 <input
                   type="text"
-                  value={data.residenceType}
-                  onChange={(e) => onChange('residenceType', e.target.value)}
+                  value={data.residenceStabilityNotes || ''}
+                  onChange={(e) => onChange('residenceStabilityNotes', e.target.value)}
+                  placeholder="e.g. 15 yrs stay, ancestral"
                   className="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white focus:outline-blue-500"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="text-slate-400 block mb-1">Location Type</label>
                 <input
                   type="text"
                   value={data.locationType}
                   onChange={(e) => onChange('locationType', e.target.value)}
+                  className="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white focus:outline-blue-500"
+                />
+              </div>
+              <div>
+                <label className="text-slate-400 block mb-1">Dist. Nearest Branch</label>
+                <input
+                  type="text"
+                  value={data.distNearestBranch}
+                  onChange={(e) => onChange('distNearestBranch', e.target.value)}
                   className="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white focus:outline-blue-500"
                 />
               </div>
