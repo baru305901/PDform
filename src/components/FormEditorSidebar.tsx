@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { PDReportData } from '../types';
+import { IncomeDictationAssistant } from './IncomeDictationAssistant';
 import {
   User,
   Users,
@@ -245,6 +246,13 @@ export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({ data, onCh
 
             <div>
               <label className="text-slate-400 block mb-1">Monthly / Family Income Observations</label>
+              <div className="mb-1.5">
+                <IncomeDictationAssistant
+                  customerName={data.customerName}
+                  businessName={data.businessNameAddress}
+                  onApplySummary={(summary) => onChange('monthlyIncomeDetails', summary)}
+                />
+              </div>
               <textarea
                 value={data.monthlyIncomeDetails}
                 onChange={(e) => onChange('monthlyIncomeDetails', e.target.value)}

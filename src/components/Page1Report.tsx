@@ -1,5 +1,6 @@
 import React from 'react';
 import { PDReportData } from '../types';
+import { IncomeDictationAssistant } from './IncomeDictationAssistant';
 
 interface Page1ReportProps {
   data: PDReportData;
@@ -275,6 +276,11 @@ export const Page1Report: React.FC<Page1ReportProps> = ({ data, onChange }) => {
         <div className="label-header">
           Monthly Income /Family Income
         </div>
+        <IncomeDictationAssistant
+          customerName={data.customerName}
+          businessName={data.businessNameAddress}
+          onApplySummary={(summary) => onChange('monthlyIncomeDetails', summary)}
+        />
         <div style={{ borderBottom: '1.5px solid #000', height: '175px', padding: '4px', boxSizing: 'border-box' }}>
           <textarea
             value={data.monthlyIncomeDetails}
