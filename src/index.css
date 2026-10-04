@@ -1,0 +1,192 @@
+@import "tailwindcss";
+
+/* Global Document & Printing Typography */
+* {
+  box-sizing: border-box;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* Strict A4 Paper Dimensions (210mm x 297mm) */
+.a4-page {
+  width: 210mm;
+  height: 297mm;
+  max-height: 297mm;
+  min-height: 297mm;
+  padding: 10mm 12mm;
+  margin: 20px auto;
+  background: #ffffff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.4);
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease-in-out;
+}
+
+/* Inner bordered sheet matching physical document frame */
+.report-sheet {
+  border: 2px solid #000000;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #ffffff;
+  overflow: hidden;
+}
+
+/* High contrast table borders identical to print form */
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.doc-table th, 
+.doc-table td {
+  border: 1px solid #000000;
+  padding: 2.5px 4px;
+  font-size: 10.5px;
+  line-height: 1.2;
+  vertical-align: middle;
+  color: #000000;
+}
+
+.label-header {
+  background-color: #000000;
+  color: #ffffff !important;
+  font-weight: 800;
+  text-transform: uppercase;
+  font-size: 10px;
+  letter-spacing: 0.3px;
+  text-align: center;
+  padding: 3px 4px;
+}
+
+.field-label {
+  font-weight: 700;
+  font-size: 10px;
+  color: #000000;
+  display: block;
+}
+
+/* Embedded editable field styling */
+.form-input {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 11px;
+  font-family: inherit;
+  color: #0f2b5c;
+  padding: 1px 2px;
+}
+
+.form-input:focus {
+  background-color: #eff6ff;
+  outline: 1px dashed #2563eb;
+  border-radius: 2px;
+}
+
+.form-textarea {
+  width: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 11px;
+  font-family: inherit;
+  resize: none;
+  padding: 2px;
+  display: block;
+  color: #0f2b5c;
+}
+
+.form-textarea:focus {
+  background-color: #eff6ff;
+  outline: 1px dashed #2563eb;
+  border-radius: 2px;
+}
+
+.handwritten {
+  font-weight: 600;
+  color: #0d2850;
+}
+
+.font-script-mode .handwritten,
+.font-script-mode .form-input,
+.font-script-mode .form-textarea {
+  font-family: 'Caveat', cursive, sans-serif;
+  font-size: 13.5px;
+  line-height: 1.15;
+  color: #0c2d6b;
+  letter-spacing: 0.2px;
+}
+
+/* Hole punch visual simulation (screen only) */
+.hole-punch {
+  position: absolute;
+  left: 3.5mm;
+  width: 5.5mm;
+  height: 5.5mm;
+  border-radius: 50%;
+  background: #525252;
+  border: 1px solid #333;
+  box-shadow: inset 1px 1px 2px rgba(0,0,0,0.7);
+  opacity: 0.3;
+  pointer-events: none;
+}
+.hole-top { top: 90mm; }
+.hole-bottom { top: 195mm; }
+
+/* Exact A4 Print Configuration */
+@page {
+  size: A4 portrait;
+  margin: 0;
+}
+
+@media print {
+  html, body {
+    width: 210mm !important;
+    height: 100% !important;
+    background: #ffffff !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .a4-page {
+    width: 210mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    min-height: 297mm !important;
+    margin: 0 !important;
+    padding: 8mm 10mm !important;
+    box-shadow: none !important;
+    page-break-after: always !important;
+    page-break-inside: avoid !important;
+    break-after: page !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+    transform: none !important;
+  }
+  .a4-page:last-child {
+    page-break-after: auto !important;
+    break-after: auto !important;
+  }
+  .hole-punch {
+    display: none !important;
+  }
+  .form-input, .form-textarea {
+    background: transparent !important;
+    outline: none !important;
+    border-color: transparent !important;
+  }
+}
