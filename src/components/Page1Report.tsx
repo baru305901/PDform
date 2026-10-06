@@ -16,14 +16,14 @@ export const Page1Report: React.FC<Page1ReportProps> = ({ data, onChange }) => {
       <div className="report-sheet">
         {/* Top Header: Shop/Lead No */}
         <div style={{ borderBottom: '1.5px solid #000', padding: '2px 8px', display: 'flex', justifyContent: 'flex-end', alignItems: 'center', height: '24px' }}>
-          <span style={{ fontWeight: 700, fontSize: '11px', marginRight: '4px' }}>SHOP No :-</span>
+          <span style={{ fontWeight: 700, fontSize: '11px', marginRight: '4px' }}>SKOP No :-</span>
           <input
             type="text"
             value={data.shopNo}
             onChange={(e) => onChange('shopNo', e.target.value)}
             className="form-input handwritten font-semibold text-center"
             style={{ width: '130px', borderBottom: '1px dotted #555' }}
-            placeholder="Shop No."
+            placeholder="SKOP No."
           />
         </div>
 

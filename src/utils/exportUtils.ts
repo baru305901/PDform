@@ -156,7 +156,7 @@ export function exportToWord(data: PDReportData) {
       </head>
       <body>
         <!-- PAGE 1 -->
-        <div align="right"><b>SHOP No :-</b> ${shopNo}</div>
+        <div align="right"><b>SKOP No :-</b> ${shopNo}</div>
         <div class="title">S K FINANCE LIMITED</div>
         <div class="subtitle">PD VISIT REPORT (Residence / Business)</div>
 
