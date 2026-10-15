@@ -23,16 +23,16 @@ export const sampleKulwantSingh: PDReportData = {
   businessRef1: 'Sonu 9876543204',
   businessRef2: 'Ganpat Singh 9876543205',
   familyMembers: [
-    { id: '1', name: 'Kulwant Singh s/o Chimman Singh', age: '48', relation: 'Self', business: 'Driving School' },
-    { id: '2', name: 'Rekha w/o Kulwant Singh', age: '39', relation: 'Wife', business: 'House wife' },
-    { id: '3', name: 'Chitransha d/o Kulwant Singh', age: '20', relation: 'Daughter', business: 'Student' },
-    { id: '4', name: 'Manshika d/o Kulwant Singh', age: '18', relation: 'Daughter', business: 'Student' },
-    { id: '5', name: 'Bhumika d/o Kulwant Singh', age: '16', relation: 'Daughter', business: 'Student' },
-    { id: '6', name: 'Chandra Kanta d/o Kulwant Singh', age: '12', relation: 'Daughter', business: 'Student' },
-    { id: '7', name: 'Kushumlatta d/o Kulwant Singh', age: '10', relation: 'Daughter', business: 'Student' },
-    { id: '8', name: 'Supriya d/o Kulwant Singh', age: '7', relation: 'Daughter', business: 'Student' },
-    { id: '9', name: 'Parag Raj Singh s/o Kulwant Singh', age: '1', relation: 'Son', business: '--' },
-    { id: '10', name: '', age: '', relation: '', business: '' }
+    { id: '1', name: 'Kulwant Singh', prefix: 's/o', guardianName: 'Chimman Singh', age: '48', relation: 'Self', business: 'Driving School' },
+    { id: '2', name: 'Rekha', prefix: 'w/o', guardianName: 'Kulwant Singh', age: '39', relation: 'Wife', business: 'House wife' },
+    { id: '3', name: 'Chitransha', prefix: 'd/o', guardianName: 'Kulwant Singh', age: '20', relation: 'Daughter', business: 'Student' },
+    { id: '4', name: 'Manshika', prefix: 'd/o', guardianName: 'Kulwant Singh', age: '18', relation: 'Daughter', business: 'Student' },
+    { id: '5', name: 'Bhumika', prefix: 'd/o', guardianName: 'Kulwant Singh', age: '16', relation: 'Daughter', business: 'Student' },
+    { id: '6', name: 'Chandra Kanta', prefix: 'd/o', guardianName: 'Kulwant Singh', age: '12', relation: 'Daughter', business: 'Student' },
+    { id: '7', name: 'Kushumlatta', prefix: 'd/o', guardianName: 'Kulwant Singh', age: '10', relation: 'Daughter', business: 'Student' },
+    { id: '8', name: 'Supriya', prefix: 'd/o', guardianName: 'Kulwant Singh', age: '7', relation: 'Daughter', business: 'Student' },
+    { id: '9', name: 'Parag Raj Singh', prefix: 's/o', guardianName: 'Kulwant Singh', age: '1', relation: 'Son', business: '--' },
+    { id: '10', name: '', prefix: '', guardianName: '', age: '', relation: '', business: '' }
   ],
   masterTreeNotes: `Late Chimman Singh (Father)
   └── Kulwant Singh (Applicant, Age 48) + Rekha Devi (Co-Applicant / Property Owner, Age 39)
@@ -100,16 +100,16 @@ export const sampleRajeshSharma: PDReportData = {
   businessRef1: 'Goyal Wholesalers 9876543215',
   businessRef2: 'Shree Krishna Traders 9876543216',
   familyMembers: [
-    { id: '1', name: 'Rajesh Kumar Sharma s/o O.P. Sharma', age: '44', relation: 'Self', business: 'Grocery Business' },
-    { id: '2', name: 'Sunita Sharma w/o Rajesh Sharma', age: '41', relation: 'Wife', business: 'Assists in store' },
-    { id: '3', name: 'Aayush Sharma s/o Rajesh Sharma', age: '19', relation: 'Son', business: 'College Student (B.Com)' },
-    { id: '4', name: 'Ananya Sharma d/o Rajesh Sharma', age: '15', relation: 'Daughter', business: 'Student (Class 10)' },
-    { id: '5', name: 'Om Prakash Sharma (Father)', age: '72', relation: 'Father', business: 'Retired Pensioner' },
-    { id: '6', name: '', age: '', relation: '', business: '' },
-    { id: '7', name: '', age: '', relation: '', business: '' },
-    { id: '8', name: '', age: '', relation: '', business: '' },
-    { id: '9', name: '', age: '', relation: '', business: '' },
-    { id: '10', name: '', age: '', relation: '', business: '' }
+    { id: '1', name: 'Rajesh Kumar Sharma', prefix: 's/o', guardianName: 'O.P. Sharma', age: '44', relation: 'Self', business: 'Grocery Business' },
+    { id: '2', name: 'Sunita Sharma', prefix: 'w/o', guardianName: 'Rajesh Sharma', age: '41', relation: 'Wife', business: 'Assists in store' },
+    { id: '3', name: 'Aayush Sharma', prefix: 's/o', guardianName: 'Rajesh Sharma', age: '19', relation: 'Son', business: 'College Student (B.Com)' },
+    { id: '4', name: 'Ananya Sharma', prefix: 'd/o', guardianName: 'Rajesh Sharma', age: '15', relation: 'Daughter', business: 'Student (Class 10)' },
+    { id: '5', name: 'Om Prakash Sharma', prefix: '', guardianName: '', age: '72', relation: 'Father', business: 'Retired Pensioner' },
+    { id: '6', name: '', prefix: '', guardianName: '', age: '', relation: '', business: '' },
+    { id: '7', name: '', prefix: '', guardianName: '', age: '', relation: '', business: '' },
+    { id: '8', name: '', prefix: '', guardianName: '', age: '', relation: '', business: '' },
+    { id: '9', name: '', prefix: '', guardianName: '', age: '', relation: '', business: '' },
+    { id: '10', name: '', prefix: '', guardianName: '', age: '', relation: '', business: '' }
   ],
   masterTreeNotes: `Om Prakash Sharma (Father, 72 yrs - Retired)
   └── Rajesh Kumar Sharma (Applicant, 44 yrs) + Sunita Sharma (Co-App, 41 yrs)
@@ -174,6 +174,8 @@ export const blankReport: PDReportData = {
   familyMembers: Array.from({ length: 10 }, (_, i) => ({
     id: `${i + 1}`,
     name: '',
+    prefix: '',
+    guardianName: '',
     age: '',
     relation: '',
     business: ''
@@ -204,10 +206,10 @@ export const blankReport: PDReportData = {
   remarksNotes: '',
   mitigateNotes: '',
   recommendation: 'Recommended',
-  dirNorth: '',
-  dirSouth: '',
-  dirEast: '',
-  dirWest: '',
+  dirNorth: 'Same as document',
+  dirSouth: 'Same as document',
+  dirEast: 'Same as document',
+  dirWest: 'Same as document',
   propertySize: 'SAME AS PATTA',
   pdAuthorisedPerson: '',
   signDate: new Date().toLocaleDateString('en-GB')

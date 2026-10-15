@@ -1,5 +1,6 @@
 import React from 'react';
 import { PDReportData, FamilyMember } from '../types';
+import { formatMemberFullName } from '../utils/exportUtils';
 import { Plus, Trash2, GitFork } from 'lucide-react';
 
 interface Page2ReportProps {
@@ -35,20 +36,25 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
         m.relation.toLowerCase().includes('child')
     );
 
+    const getDisplayName = (m?: FamilyMember) => {
+      if (!m) return '';
+      return formatMemberFullName(m) || m.name || '';
+    };
+
     let tree = '';
     if (parents.length > 0) {
-      tree += parents.map((p) => `${p.name || 'Parent'} (${p.relation}, ${p.age || '-'} yrs)`).join('\n') + '\n  └── ';
+      tree += parents.map((p) => `${getDisplayName(p) || 'Parent'} (${p.relation}, ${p.age || '-'} yrs)`).join('\n') + '\n  └── ';
     }
-    tree += `${applicant?.name || data.customerName || 'Applicant'} (Applicant, ${applicant?.age || '-'} yrs)`;
+    tree += `${getDisplayName(applicant) || data.customerName || 'Applicant'} (Applicant, ${applicant?.age || '-'} yrs)`;
     if (spouse) {
-      tree += ` + ${spouse.name || 'Spouse'} (${spouse.relation}, ${spouse.age || '-'} yrs)`;
+      tree += ` + ${getDisplayName(spouse) || 'Spouse'} (${spouse.relation}, ${spouse.age || '-'} yrs)`;
     }
     tree += '\n';
 
     if (children.length > 0) {
       children.forEach((c, idx) => {
         const isLast = idx === children.length - 1;
-        tree += `        ${isLast ? '└──' : '├──'} ${c.name || 'Child'} (${c.relation}, ${c.age || '-'} yrs${c.business ? ` - ${c.business}` : ''})\n`;
+        tree += `        ${isLast ? '└──' : '├──'} ${getDisplayName(c) || 'Child'} (${c.relation}, ${c.age || '-'} yrs${c.business ? ` - ${c.business}` : ''})\n`;
       });
     }
 
@@ -93,9 +99,9 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
         <table className="doc-table" id="familyTable">
           <colgroup>
             <col style={{ width: '5%' }} />
-            <col style={{ width: '44%' }} />
-            <col style={{ width: '7%' }} />
-            <col style={{ width: '24%' }} />
+            <col style={{ width: '47%' }} />
+            <col style={{ width: '6%' }} />
+            <col style={{ width: '22%' }} />
             <col style={{ width: '20%' }} />
           </colgroup>
           <thead>
@@ -115,14 +121,52 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
             {rows.slice(0, 10).map((member, index) => (
               <tr key={member.id || index} className="group/row">
                 <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{index + 1}</td>
-                <td>
-                  <input
-                    type="text"
-                    className="form-input handwritten"
-                    value={member.name}
-                    onChange={(e) => onUpdateFamilyMember(index, 'name', e.target.value)}
-                    placeholder={index === 0 ? 'Applicant Full Name' : ''}
-                  />
+                <td style={{ padding: '1px 2px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '2px' }}>
+                    <input
+                      type="text"
+                      className="form-input handwritten"
+                      style={{ flex: '1 1 50%', minWidth: '0', fontSize: '11px' }}
+                      value={member.name}
+                      onChange={(e) => onUpdateFamilyMember(index, 'name', e.target.value)}
+                      placeholder={index === 0 ? 'Applicant Name' : 'Member Name'}
+                    />
+                    <select
+                      className="form-input handwritten cursor-pointer bg-transparent text-center font-bold"
+                      style={{
+                        width: '46px',
+                        height: '21px',
+                        padding: '0 1px',
+                        fontSize: '10px',
+                        border: '1px solid #777',
+                        borderRadius: '2px',
+                        flexShrink: 0
+                      }}
+                      value={member.prefix || '--'}
+                      onChange={(e) =>
+                        onUpdateFamilyMember(
+                          index,
+                          'prefix',
+                          e.target.value === '--' ? '' : e.target.value
+                        )
+                      }
+                      title="Relation Prefix (s/o, w/o, d/o, c/o)"
+                    >
+                      <option value="--">--</option>
+                      <option value="s/o">s/o</option>
+                      <option value="w/o">w/o</option>
+                      <option value="d/o">d/o</option>
+                      <option value="c/o">c/o</option>
+                    </select>
+                    <input
+                      type="text"
+                      className="form-input handwritten"
+                      style={{ flex: '1 1 45%', minWidth: '0', fontSize: '11px' }}
+                      value={member.guardianName || ''}
+                      onChange={(e) => onUpdateFamilyMember(index, 'guardianName', e.target.value)}
+                      placeholder="Father / Spouse"
+                    />
+                  </div>
                 </td>
                 <td>
                   <input
@@ -145,15 +189,38 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
                     <option value="Father">Father</option>
                     <option value="Mother">Mother</option>
                     <option value="Wife">Wife</option>
+                    <option value="Husband">Husband</option>
                     <option value="Son">Son</option>
                     <option value="Daughter">Daughter</option>
                     <option value="Brother">Brother</option>
                     <option value="Sister">Sister</option>
+                    <option value="Sister-in-law">Sister-in-law (Bhabhi)</option>
+                    <option value="Brother-in-law">Brother-in-law</option>
+                    <option value="Grandson">Grandson (Pota)</option>
+                    <option value="Granddaughter">Granddaughter (Poti)</option>
                     <option value="Grandfather">Grandfather</option>
                     <option value="Grandmother">Grandmother</option>
                     <option value="Other">Other</option>
                     {member.relation &&
-                      !['Self', 'Father', 'Mother', 'Wife', 'Son', 'Daughter', 'Brother', 'Sister', 'Grandfather', 'Grandmother', 'Other', ''].includes(member.relation) && (
+                      ![
+                        'Self',
+                        'Father',
+                        'Mother',
+                        'Wife',
+                        'Husband',
+                        'Son',
+                        'Daughter',
+                        'Brother',
+                        'Sister',
+                        'Sister-in-law',
+                        'Brother-in-law',
+                        'Grandson',
+                        'Granddaughter',
+                        'Grandfather',
+                        'Grandmother',
+                        'Other',
+                        ''
+                      ].includes(member.relation) && (
                         <option value={member.relation}>{member.relation}</option>
                       )}
                   </select>

@@ -1,5 +1,20 @@
 import * as XLSX from 'xlsx';
-import { PDReportData } from '../types';
+import { PDReportData, FamilyMember } from '../types';
+
+export const formatMemberFullName = (m?: FamilyMember): string => {
+  if (!m) return '';
+  const name = m.name?.trim() || '';
+  const prefix = m.prefix && m.prefix !== '--' ? m.prefix.trim() : '';
+  const guardian = m.guardianName?.trim() || '';
+
+  if (name && prefix && guardian) {
+    return `${name} ${prefix} ${guardian}`;
+  }
+  if (name && guardian) {
+    return `${name} (${guardian})`;
+  }
+  return name;
+};
 
 export function exportToExcel(data: PDReportData) {
   try {
@@ -62,8 +77,9 @@ export function exportToExcel(data: PDReportData) {
     ];
 
     data.familyMembers.forEach((member, index) => {
-      if (member.name || member.age || member.relation || member.business) {
-        familyData.push([index + 1, member.name, member.age, member.relation, member.business]);
+      const displayName = formatMemberFullName(member);
+      if (displayName || member.age || member.relation || member.business) {
+        familyData.push([index + 1, displayName, member.age, member.relation, member.business]);
       }
     });
 
@@ -123,11 +139,12 @@ export function exportToWord(data: PDReportData) {
 
     let famHtmlRows = '';
     data.familyMembers.forEach((member, i) => {
-      if (member.name || member.age || member.relation || member.business) {
+      const displayName = formatMemberFullName(member);
+      if (displayName || member.age || member.relation || member.business) {
         famHtmlRows += `
           <tr>
             <td align="center">${i + 1}</td>
-            <td>${member.name || '-'}</td>
+            <td>${displayName || '-'}</td>
             <td align="center">${member.age || '-'}</td>
             <td>${member.relation || '-'}</td>
             <td>${member.business || '-'}</td>
@@ -169,7 +186,7 @@ export function exportToWord(data: PDReportData) {
           </tr>
           <tr>
             <td><b>Customer Name:</b></td>
-            <td colspan="3">${data.customerName}</td>
+            <td colspan="3">${custName}</td>
           </tr>
           <tr>
             <td><b>Stability & Residence type:</b></td>
@@ -260,9 +277,9 @@ export function exportToWord(data: PDReportData) {
         <table>
           <tr>
             <td width="25%"><b>CIBIL Score:</b></td>
-            <td><b>App:</b> ${data.cibilAppName || '-'} (${data.cibilAppScore || '-'})</td>
-            <td><b>Co-App 1:</b> ${data.cibilCoApp1Name || '-'} (${data.cibilCoApp1Score || '-'})</td>
-            <td><b>Co-App 2:</b> ${data.cibilCoApp2Name || '-'} (${data.cibilCoApp2Score || '-'})</td>
+            <td><b>App:</b> ${data.cibilAppName || '-'}${data.cibilAppScore ? ` (${data.cibilAppScore})` : ''}</td>
+            <td><b>Co-App 1:</b> ${data.cibilCoApp1Name || '-'}${data.cibilCoApp1Score ? ` (${data.cibilCoApp1Score})` : ''}</td>
+            <td><b>Co-App 2:</b> ${data.cibilCoApp2Name || '-'}${data.cibilCoApp2Score ? ` (${data.cibilCoApp2Score})` : ''}</td>
           </tr>
           <tr>
             <td><b>Existing Loan Detail:</b></td>

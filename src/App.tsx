@@ -127,6 +127,8 @@ export default function App() {
         {
           id: `${Date.now()}`,
           name: '',
+          prefix: '',
+          guardianName: '',
           age: '',
           relation: '',
           business: ''
@@ -254,8 +256,12 @@ export default function App() {
             </span>
             <span className="text-slate-500">|</span>
             <span>Family Members: <strong className="text-slate-200">{totalFamilyCount || '0'}</strong></span>
-            <span className="text-slate-500">|</span>
-            <span>Applicant CIBIL: <strong className="text-amber-300 font-mono">{reportData.cibilAppScore || 'NA'}</strong></span>
+            {reportData.cibilAppScore && reportData.cibilAppScore.trim() !== '' && (
+              <>
+                <span className="text-slate-500">|</span>
+                <span>Applicant CIBIL: <strong className="text-amber-300 font-mono">{reportData.cibilAppScore}</strong></span>
+              </>
+            )}
             <span className="text-slate-500">|</span>
             <span>Legal: <strong className="text-slate-200">{reportData.legalStatus}</strong></span>
           </div>

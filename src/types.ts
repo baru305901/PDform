@@ -1,6 +1,8 @@
 export interface FamilyMember {
   id: string;
   name: string;
+  prefix?: 's/o' | 'w/o' | 'd/o' | 'c/o' | '--' | '' | string;
+  guardianName?: string;
   age: string;
   relation: string;
   business: string;

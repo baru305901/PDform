@@ -104,6 +104,7 @@ export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({ data, onCh
                 value={data.customerName}
                 onChange={(e) => onChange('customerName', e.target.value)}
                 className="w-full bg-slate-800 border border-slate-700 rounded px-2.5 py-1.5 text-white font-medium focus:outline-blue-500"
+                placeholder="Primary Borrower Full Name"
               />
             </div>
 
@@ -431,6 +432,7 @@ export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({ data, onCh
                     type="text"
                     value={data.dirNorth}
                     onChange={(e) => onChange('dirNorth', e.target.value)}
+                    placeholder="Same as document"
                     className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs"
                   />
                 </div>
@@ -440,6 +442,7 @@ export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({ data, onCh
                     type="text"
                     value={data.dirSouth}
                     onChange={(e) => onChange('dirSouth', e.target.value)}
+                    placeholder="Same as document"
                     className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs"
                   />
                 </div>
@@ -449,6 +452,7 @@ export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({ data, onCh
                     type="text"
                     value={data.dirEast}
                     onChange={(e) => onChange('dirEast', e.target.value)}
+                    placeholder="Same as document"
                     className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs"
                   />
                 </div>
@@ -458,6 +462,7 @@ export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({ data, onCh
                     type="text"
                     value={data.dirWest}
                     onChange={(e) => onChange('dirWest', e.target.value)}
+                    placeholder="Same as document"
                     className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-white text-xs"
                   />
                 </div>

@@ -111,14 +111,24 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
     }
 
     setIsLoading(true);
-    setStatusMessage('Generating professional English credit summary with Gemini...');
+    setStatusMessage('Generating natural income summary with Gemini...');
 
     try {
       const ai = new GoogleGenAI({
         apiKey: activeKey,
       });
 
-      const systemInstruction = `You are a Senior Credit Officer at an NBFC. Take these raw field notes (in Hindi, Marwadi, or Hinglish) and convert them into a professional, formal English paragraph assessing the customer's monthly income, cash flow, and disposable surplus. Output ONLY clean formal English. Preserve all numbers and calculations.`;
+      const systemInstruction = `You are a field credit officer at an NBFC writing a practical, natural PD income summary.
+Convert raw field notes (in Hindi, Marwadi, or Hinglish) into a simple, short, and natural plain-language assessment (2-3 sentences max).
+Avoid heavy, complex, or overly formal banking jargon and artificial corporate words.
+Style guidelines:
+- Write in simple, natural Hinglish/plain language commonly used in Indian NBFC credit memos.
+- Capture the work/business location, vintage, daily cash collection/galla, gross monthly income, key expenses, and clear statement of household savings/repayment capacity.
+- Accurately preserve all numbers, currency figures (₹), and calculations from the raw notes.
+- Do NOT use bullet points, bold formatting, quotes, or headers. Output ONLY the clean single paragraph.
+
+Example reference tone:
+"Applicant Sedriya Road highway bridge ke niche pichhle 20 saal se fruit cart chala raha hai. Daily income approx ₹1,500-₹2,000 hai aur monthly income ₹45,000-₹60,000 tak rehti hai. Bachat aur household kharch ke baad repayment capacity theek hai."`;
 
       const prompt = `Applicant: ${customerName || 'Borrower'} | Business: ${businessName || 'Trading/Services'} | Raw Field Notes: "${textToSummarize}"`;
 
@@ -133,7 +143,7 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
             contents: prompt,
             config: {
               systemInstruction,
-              temperature: 0.2,
+              temperature: 0.3,
             },
           });
 
@@ -149,9 +159,9 @@ export const IncomeDictationAssistant: React.FC<IncomeDictationAssistantProps> =
         throw new Error(lastError?.message || 'Failed to receive summary from Gemini API');
       }
 
-      // Populate formal English summary strictly from Gemini into report
+      // Populate natural plain-language summary strictly from Gemini into report
       onApplySummary(summary);
-      setStatusMessage('✓ English Credit Summary generated & populated!');
+      setStatusMessage('✓ Income Summary generated & populated!');
       setTimeout(() => {
         setStatusMessage(null);
         setIsOpen(false);

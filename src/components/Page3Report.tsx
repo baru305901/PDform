@@ -12,19 +12,20 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
   const [isSignModalOpen, setIsSignModalOpen] = useState(false);
 
   // Helper for CIBIL score visual badge on screen
-  const getCibilBadge = (scoreStr: string) => {
+  const getCibilBadge = (scoreStr?: string) => {
+    if (!scoreStr || !scoreStr.trim()) return null;
     const score = parseInt(scoreStr, 10);
     if (isNaN(score)) return null;
     if (score === -1) {
-      return <span className="no-print text-[9px] text-blue-600 font-normal block">New to Credit</span>;
+      return <span className="no-print text-[9px] text-blue-600 font-semibold block">New to Credit</span>;
     }
     if (score >= 700) {
-      return <span className="no-print text-[9px] text-emerald-600 font-normal block">Prime</span>;
+      return <span className="no-print text-[9px] text-emerald-600 font-semibold block">Prime</span>;
     }
     if (score >= 650) {
-      return <span className="no-print text-[9px] text-amber-600 font-normal block">Fair</span>;
+      return <span className="no-print text-[9px] text-amber-600 font-semibold block">Fair</span>;
     }
-    return <span className="no-print text-[9px] text-red-600 font-normal block">Critical</span>;
+    return <span className="no-print text-[9px] text-red-600 font-semibold block">Critical</span>;
   };
 
   return (
@@ -36,84 +37,96 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
         {/* CIBIL Scores Header Grid */}
         <table className="doc-table">
           <colgroup>
-            <col style={{ width: '32%' }} />
-            <col style={{ width: '17%' }} />
-            <col style={{ width: '17%' }} />
-            <col style={{ width: '17%' }} />
-            <col style={{ width: '17%' }} />
+            <col style={{ width: '28%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
+            <col style={{ width: '18%' }} />
           </colgroup>
           <tbody>
             <tr>
               <td rowSpan={2} className="field-label" style={{ verticalAlign: 'middle', fontSize: '11px' }}>
                 CIBIL Score
               </td>
-              <td style={{ fontSize: '9.5px', fontWeight: 700 }}>
-                App -{' '}
-                <input
-                  type="text"
-                  value={data.cibilAppName}
-                  onChange={(e) => onChange('cibilAppName', e.target.value)}
-                  className="form-input handwritten font-bold inline-block"
-                  style={{ width: '60%' }}
-                  placeholder="KULWANT"
-                />
+              <td style={{ padding: '2px 3px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1px' }}>
+                  <span style={{ fontSize: '9px', fontWeight: 800, color: '#000', whiteSpace: 'nowrap' }}>App -</span>
+                  <input
+                    type="text"
+                    value={data.cibilAppName}
+                    onChange={(e) => onChange('cibilAppName', e.target.value)}
+                    className="form-input handwritten font-bold"
+                    style={{ width: '100%', fontSize: '10px' }}
+                    placeholder="Applicant Name"
+                    title={data.cibilAppName}
+                  />
+                </div>
               </td>
-              <td style={{ fontSize: '9.5px', fontWeight: 700 }}>
-                Co-App -{' '}
-                <input
-                  type="text"
-                  value={data.cibilCoApp1Name}
-                  onChange={(e) => onChange('cibilCoApp1Name', e.target.value)}
-                  className="form-input handwritten font-bold inline-block"
-                  style={{ width: '50%' }}
-                  placeholder="CO-APP 1"
-                />
+              <td style={{ padding: '2px 3px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1px' }}>
+                  <span style={{ fontSize: '9px', fontWeight: 800, color: '#000', whiteSpace: 'nowrap' }}>Co-App 1 -</span>
+                  <input
+                    type="text"
+                    value={data.cibilCoApp1Name}
+                    onChange={(e) => onChange('cibilCoApp1Name', e.target.value)}
+                    className="form-input handwritten font-bold"
+                    style={{ width: '100%', fontSize: '10px' }}
+                    placeholder="Co-App 1 Name"
+                    title={data.cibilCoApp1Name}
+                  />
+                </div>
               </td>
-              <td style={{ fontSize: '9.5px', fontWeight: 700 }}>
-                Co-App -{' '}
-                <input
-                  type="text"
-                  value={data.cibilCoApp2Name}
-                  onChange={(e) => onChange('cibilCoApp2Name', e.target.value)}
-                  className="form-input handwritten font-bold inline-block"
-                  style={{ width: '50%' }}
-                  placeholder="CO-APP 2"
-                />
+              <td style={{ padding: '2px 3px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1px' }}>
+                  <span style={{ fontSize: '9px', fontWeight: 800, color: '#000', whiteSpace: 'nowrap' }}>Co-App 2 -</span>
+                  <input
+                    type="text"
+                    value={data.cibilCoApp2Name}
+                    onChange={(e) => onChange('cibilCoApp2Name', e.target.value)}
+                    className="form-input handwritten font-bold"
+                    style={{ width: '100%', fontSize: '10px' }}
+                    placeholder="Co-App 2 Name"
+                    title={data.cibilCoApp2Name}
+                  />
+                </div>
               </td>
-              <td style={{ fontSize: '9.5px', fontWeight: 700 }}>
-                Co-App -{' '}
-                <input
-                  type="text"
-                  value={data.cibilCoApp3Name}
-                  onChange={(e) => onChange('cibilCoApp3Name', e.target.value)}
-                  className="form-input handwritten font-bold inline-block"
-                  style={{ width: '50%' }}
-                  placeholder="CO-APP 3"
-                />
+              <td style={{ padding: '2px 3px' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', width: '100%', gap: '1px' }}>
+                  <span style={{ fontSize: '9px', fontWeight: 800, color: '#000', whiteSpace: 'nowrap' }}>Co-App 3 -</span>
+                  <input
+                    type="text"
+                    value={data.cibilCoApp3Name}
+                    onChange={(e) => onChange('cibilCoApp3Name', e.target.value)}
+                    className="form-input handwritten font-bold"
+                    style={{ width: '100%', fontSize: '10px' }}
+                    placeholder="Co-App 3 Name"
+                    title={data.cibilCoApp3Name}
+                  />
+                </div>
               </td>
             </tr>
             <tr>
-              <td className="text-center">
+              <td className="text-center" style={{ padding: '2px' }}>
                 <input
                   type="text"
                   value={data.cibilAppScore}
                   onChange={(e) => onChange('cibilAppScore', e.target.value)}
                   className="form-input handwritten font-bold text-center text-sm"
-                  placeholder="697"
+                  placeholder=""
                 />
                 {getCibilBadge(data.cibilAppScore)}
               </td>
-              <td className="text-center">
+              <td className="text-center" style={{ padding: '2px' }}>
                 <input
                   type="text"
                   value={data.cibilCoApp1Score}
                   onChange={(e) => onChange('cibilCoApp1Score', e.target.value)}
                   className="form-input handwritten font-bold text-center text-sm"
-                  placeholder="-1"
+                  placeholder=""
                 />
                 {getCibilBadge(data.cibilCoApp1Score)}
               </td>
-              <td className="text-center">
+              <td className="text-center" style={{ padding: '2px' }}>
                 <input
                   type="text"
                   value={data.cibilCoApp2Score}
@@ -123,7 +136,7 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
                 />
                 {getCibilBadge(data.cibilCoApp2Score)}
               </td>
-              <td className="text-center">
+              <td className="text-center" style={{ padding: '2px' }}>
                 <input
                   type="text"
                   value={data.cibilCoApp3Score}
@@ -335,7 +348,7 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
                   onChange={(e) => onChange('deviationFindings', e.target.value)}
                   className="form-textarea handwritten"
                   rows={5}
-                  placeholder="(Record any negative findings, discrepancies or deviations)"
+                  placeholder=""
                 />
               </td>
               <td style={{ height: '100px', verticalAlign: 'top' }}>
@@ -344,7 +357,7 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
                   onChange={(e) => onChange('remarksNotes', e.target.value)}
                   className="form-textarea handwritten"
                   rows={5}
-                  placeholder="(General remarks on applicant demeanor, business stability, premises)"
+                  placeholder=""
                 />
               </td>
             </tr>
@@ -373,7 +386,7 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
                   onChange={(e) => onChange('mitigateNotes', e.target.value)}
                   className="form-textarea handwritten"
                   rows={5}
-                  placeholder="(Factors mitigating the deviations recorded above)"
+                  placeholder=""
                 />
               </td>
               <td style={{ height: '100px', verticalAlign: 'middle', textAlign: 'center' }}>
@@ -437,7 +450,7 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
                   value={data.dirNorth}
                   onChange={(e) => onChange('dirNorth', e.target.value)}
                   className="form-input handwritten"
-                  placeholder="Adjacent property"
+                  placeholder="Same as document"
                 />
               </td>
               <td
@@ -462,7 +475,7 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
                   value={data.dirSouth}
                   onChange={(e) => onChange('dirSouth', e.target.value)}
                   className="form-input handwritten"
-                  placeholder="Adjacent property / Road"
+                  placeholder="Same as document"
                 />
               </td>
             </tr>
@@ -474,7 +487,7 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
                   value={data.dirEast}
                   onChange={(e) => onChange('dirEast', e.target.value)}
                   className="form-input handwritten"
-                  placeholder="Adjacent property / Street"
+                  placeholder="Same as document"
                 />
               </td>
             </tr>
@@ -486,7 +499,7 @@ export const Page3Report: React.FC<Page3ReportProps> = ({ data, onChange }) => {
                   value={data.dirWest}
                   onChange={(e) => onChange('dirWest', e.target.value)}
                   className="form-input handwritten"
-                  placeholder="Adjacent property"
+                  placeholder="Same as document"
                 />
               </td>
             </tr>
