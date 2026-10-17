@@ -167,6 +167,10 @@ select.form-input {
   padding-right: 14px;
 }
 
+.print-only {
+  display: none !important;
+}
+
 @media print {
   html, body {
     width: 210mm !important;
@@ -178,6 +182,9 @@ select.form-input {
   }
   .no-print {
     display: none !important;
+  }
+  .print-only {
+    display: block !important;
   }
   .mobile-sheet-viewport {
     overflow: visible !important;

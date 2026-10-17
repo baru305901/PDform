@@ -8,6 +8,18 @@ export interface FamilyMember {
   business: string;
 }
 
+export interface SavedReportRecord {
+  id: string;
+  shopNo: string;
+  customerName: string;
+  visitDate: string;
+  visitLocation: string;
+  contactNumbers: string;
+  createdAt: string;
+  updatedAt: string;
+  reportData: PDReportData;
+}
+
 export interface PDReportData {
   // Page 1: Header & Shop
   shopNo: string;

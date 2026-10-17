@@ -31,9 +31,18 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
     );
     const children = data.familyMembers.filter(
       (m) =>
-        m.relation.toLowerCase().includes('son') ||
-        m.relation.toLowerCase().includes('daughter') ||
-        m.relation.toLowerCase().includes('child')
+        ((m.relation.toLowerCase().includes('son') && !m.relation.toLowerCase().includes('grand') && !m.relation.toLowerCase().includes('law')) ||
+          (m.relation.toLowerCase().includes('daughter') && !m.relation.toLowerCase().includes('grand') && !m.relation.toLowerCase().includes('law')) ||
+          m.relation.toLowerCase().includes('child')) &&
+        m.id !== applicant?.id
+    );
+    const others = data.familyMembers.filter(
+      (m) =>
+        m.id !== applicant?.id &&
+        m.id !== spouse?.id &&
+        !parents.some((p) => p.id === m.id) &&
+        !children.some((c) => c.id === m.id) &&
+        (m.name || m.relation)
     );
 
     const getDisplayName = (m?: FamilyMember) => {
@@ -53,8 +62,15 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
 
     if (children.length > 0) {
       children.forEach((c, idx) => {
-        const isLast = idx === children.length - 1;
+        const isLast = idx === children.length - 1 && others.length === 0;
         tree += `        ${isLast ? '└──' : '├──'} ${getDisplayName(c) || 'Child'} (${c.relation}, ${c.age || '-'} yrs${c.business ? ` - ${c.business}` : ''})\n`;
+      });
+    }
+
+    if (others.length > 0) {
+      others.forEach((o, idx) => {
+        const isLast = idx === others.length - 1;
+        tree += `        ${isLast ? '└──' : '├──'} ${getDisplayName(o) || 'Member'} (${o.relation || 'Relative'}, ${o.age || '-'} yrs${o.business ? ` - ${o.business}` : ''})\n`;
       });
     }
 
@@ -122,7 +138,12 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
               <tr key={member.id || index} className="group/row">
                 <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{index + 1}</td>
                 <td style={{ padding: '1px 2px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '2px' }}>
+                  {/* Clean formatted text for A4 physical print & PDF */}
+                  <div className="print-only handwritten font-semibold text-[11px] truncate">
+                    {formatMemberFullName(member) || member.name || ''}
+                  </div>
+                  {/* Interactive inputs & relation prefix dropdown for screen editing */}
+                  <div className="no-print" style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '2px' }}>
                     <input
                       type="text"
                       className="form-input handwritten"
@@ -132,13 +153,13 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
                       placeholder={index === 0 ? 'Applicant Name' : 'Member Name'}
                     />
                     <select
-                      className="form-input handwritten cursor-pointer bg-transparent text-center font-bold"
+                      className="form-input handwritten cursor-pointer bg-transparent text-center font-bold text-slate-800"
                       style={{
                         width: '46px',
                         height: '21px',
                         padding: '0 1px',
                         fontSize: '10px',
-                        border: '1px solid #777',
+                        border: '1px solid #94a3b8',
                         borderRadius: '2px',
                         flexShrink: 0
                       }}
@@ -178,8 +199,11 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
                   />
                 </td>
                 <td>
+                  <div className="print-only handwritten text-center font-semibold text-[11px]">
+                    {member.relation || ''}
+                  </div>
                   <select
-                    className="form-input handwritten cursor-pointer bg-transparent"
+                    className="no-print form-input handwritten cursor-pointer bg-transparent"
                     value={member.relation}
                     onChange={(e) => onUpdateFamilyMember(index, 'relation', e.target.value)}
                     style={{ width: '100%', height: '22px' }}
@@ -192,6 +216,7 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
                     <option value="Husband">Husband</option>
                     <option value="Son">Son</option>
                     <option value="Daughter">Daughter</option>
+                    <option value="Daughter in law">Daughter in law (Bahu)</option>
                     <option value="Brother">Brother</option>
                     <option value="Sister">Sister</option>
                     <option value="Sister-in-law">Sister-in-law (Bhabhi)</option>
@@ -210,6 +235,8 @@ export const Page2Report: React.FC<Page2ReportProps> = ({
                         'Husband',
                         'Son',
                         'Daughter',
+                        'Daughter in law',
+                        'Daughter-in-law',
                         'Brother',
                         'Sister',
                         'Sister-in-law',

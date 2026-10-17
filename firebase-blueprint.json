@@ -1,0 +1,54 @@
+{
+  "entities": {
+    "SavedReport": {
+      "title": "SavedReport",
+      "description": "A persistent SK Finance Personal Discussion (PD) Visit Report record",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the saved report"
+        },
+        "shopNo": {
+          "type": "string",
+          "description": "SKOP / Shop / Lead Number"
+        },
+        "customerName": {
+          "type": "string",
+          "description": "Primary Applicant / Customer Name"
+        },
+        "visitDate": {
+          "type": "string",
+          "description": "Date of PD visit"
+        },
+        "visitLocation": {
+          "type": "string",
+          "description": "Location / village of visit"
+        },
+        "contactNumbers": {
+          "type": "string",
+          "description": "Applicant verified contact phone numbers"
+        },
+        "reportData": {
+          "type": "object",
+          "description": "Full serialized PDReportData object including all pages, sections, and family members"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "ISO timestamp when report was created"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "ISO timestamp when report was last modified"
+        }
+      },
+      "required": ["id", "customerName", "createdAt", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/saved_reports/{reportId}": {
+      "schema": "SavedReport",
+      "description": "Collection of all saved SK Finance PD visit reports"
+    }
+  }
+}

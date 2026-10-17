@@ -4,19 +4,37 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { PDReportData, FamilyMember } from './types';
+import { PDReportData, FamilyMember, SavedReportRecord } from './types';
 import { sampleKulwantSingh, sampleRajeshSharma, blankReport } from './sampleData';
 import { HeaderBar } from './components/HeaderBar';
 import { Page1Report } from './components/Page1Report';
 import { Page2Report } from './components/Page2Report';
 import { Page3Report } from './components/Page3Report';
 import { FormEditorSidebar } from './components/FormEditorSidebar';
+import { SavedReportsModal } from './components/SavedReportsModal';
+import { UploadReportModal } from './components/UploadReportModal';
+import { DuplicateWarningModal, DuplicateAlertInfo } from './components/DuplicateWarningModal';
+import { saveReport, fetchAllReports, testConnection, DuplicateReportError, subscribeToSavedReports, getLocalCache } from './services/firebase';
 import { exportToExcel, exportToWord, exportToJson } from './utils/exportUtils';
 import { CheckCircle, AlertCircle, Info, ChevronRight } from 'lucide-react';
 
 const STORAGE_KEY = 'sk_finance_pd_report_state_v2';
+const ACTIVE_REPORT_ID_KEY = 'sk_finance_active_report_id';
 
 export default function App() {
+  const [currentReportId, setCurrentReportId] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(ACTIVE_REPORT_ID_KEY) || null;
+    } catch {
+      return null;
+    }
+  });
+  const [isReportModified, setIsReportModified] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [isSavedReportsModalOpen, setIsSavedReportsModalOpen] = useState<boolean>(false);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [duplicateAlert, setDuplicateAlert] = useState<DuplicateAlertInfo | null>(null);
+  const [savedReportsCount, setSavedReportsCount] = useState<number>(0);
   // Load saved state or default to sampleKulwantSingh
   const [reportData, setReportData] = useState<PDReportData>(() => {
     try {
@@ -89,6 +107,60 @@ export default function App() {
     }
   }, [reportData]);
 
+  // Keep active report ID in storage
+  useEffect(() => {
+    try {
+      if (currentReportId) {
+        localStorage.setItem(ACTIVE_REPORT_ID_KEY, currentReportId);
+      } else {
+        localStorage.removeItem(ACTIVE_REPORT_ID_KEY);
+      }
+    } catch (e) {
+      console.error('Error saving active report id:', e);
+    }
+  }, [currentReportId]);
+
+  // Real-time Firestore subscription & storage listener for exact Saved Reports count
+  useEffect(() => {
+    testConnection();
+
+    // 1. Initial count immediately from local cache (0 latency)
+    const initialRecords = getLocalCache();
+    setSavedReportsCount(initialRecords.length);
+
+    // 2. Real-time Firestore snapshot subscription
+    const unsubscribe = subscribeToSavedReports((records) => {
+      setSavedReportsCount(records.length);
+    });
+
+    // 3. Listen to local storage & cache update events for instant offline updates
+    const handleLocalUpdate = (e: any) => {
+      const count = e?.detail?.count ?? getLocalCache().length;
+      setSavedReportsCount(count);
+    };
+
+    window.addEventListener('sk_reports_changed', handleLocalUpdate);
+    window.addEventListener('storage', handleLocalUpdate);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('sk_reports_changed', handleLocalUpdate);
+      window.removeEventListener('storage', handleLocalUpdate);
+    };
+  }, []);
+
+  // Browser warn on reload/leave if report has unsaved changes
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isReportModified) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isReportModified]);
+
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => {
@@ -97,6 +169,7 @@ export default function App() {
   };
 
   const handleFieldChange = <K extends keyof PDReportData>(key: K, value: PDReportData[K]) => {
+    setIsReportModified(true);
     setReportData((prev) => ({
       ...prev,
       [key]: value
@@ -104,6 +177,7 @@ export default function App() {
   };
 
   const handleUpdateFamilyMember = (index: number, field: keyof FamilyMember, val: string) => {
+    setIsReportModified(true);
     setReportData((prev) => {
       const updated = [...prev.familyMembers];
       if (updated[index]) {
@@ -120,6 +194,7 @@ export default function App() {
   };
 
   const handleAddFamilyRow = () => {
+    setIsReportModified(true);
     setReportData((prev) => ({
       ...prev,
       familyMembers: [
@@ -139,13 +214,117 @@ export default function App() {
   };
 
   const handleRemoveFamilyRow = (index: number) => {
+    setIsReportModified(true);
     setReportData((prev) => ({
       ...prev,
       familyMembers: prev.familyMembers.filter((_, i) => i !== index)
     }));
   };
 
+  const handleSaveReport = async () => {
+    if (isSaving) return;
+    setIsSaving(true);
+    try {
+      const savedRecord = await saveReport(reportData, currentReportId || undefined);
+      setCurrentReportId(savedRecord.id);
+      setIsReportModified(false);
+      showToast(`✓ Report saved to database! (ID: ${savedRecord.id})`);
+    } catch (err: any) {
+      console.error('Error saving report to database:', err);
+      if (err instanceof DuplicateReportError || err?.name === 'DuplicateReportError') {
+        setDuplicateAlert({
+          field: err.field,
+          value: err.value,
+          conflictingCustomer: err.conflictingCustomer,
+          conflictingReportId: err.conflictingReportId,
+          conflictingDate: err.conflictingDate,
+          message: err.message
+        });
+        showToast(`Save blocked: Duplicate ${err.field === 'skop' ? 'SKOP Number' : 'Mobile Number'} detected!`);
+      } else {
+        showToast(`Failed to save report: ${err?.message || err}`);
+      }
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleLoadReportFromUpload = async (data: PDReportData, autoSaveToDb: boolean = false) => {
+    // 1. Populate all form inputs across the report editor
+    setReportData(data);
+    setIsReportModified(true);
+
+    if (autoSaveToDb) {
+      setIsSaving(true);
+      try {
+        const savedRecord = await saveReport(data);
+        setCurrentReportId(savedRecord.id);
+        setIsReportModified(false);
+        showToast(`✓ Report for "${data.customerName || 'Applicant'}" uploaded and saved! (ID: ${savedRecord.id})`);
+      } catch (err: any) {
+        console.error('Error saving uploaded report:', err);
+        if (err instanceof DuplicateReportError || err?.name === 'DuplicateReportError') {
+          setDuplicateAlert({
+            field: err.field,
+            value: err.value,
+            conflictingCustomer: err.conflictingCustomer,
+            conflictingReportId: err.conflictingReportId,
+            conflictingDate: err.conflictingDate,
+            message: err.message
+          });
+          showToast(`Report loaded into form, but database save was blocked: Duplicate ${err.field === 'skop' ? 'SKOP' : 'Mobile'} detected.`);
+        } else {
+          showToast(`Report loaded into form, but database save failed: ${err?.message || err}`);
+        }
+      } finally {
+        setIsSaving(false);
+      }
+    } else {
+      // User opted to review and edit fields before saving
+      setCurrentReportId(null);
+      setIsReportModified(true);
+      showToast(`✓ Report for "${data.customerName || 'Applicant'}" loaded. Review, edit fields, then click "Save Report".`);
+    }
+
+    // Scroll to top of preview sheet so user can review immediately
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleOpenReport = (record: SavedReportRecord) => {
+    if (isReportModified) {
+      const confirmDiscard = window.confirm(
+        'You have unsaved changes in the current report. Do you want to open this saved report anyway?'
+      );
+      if (!confirmDiscard) return;
+    }
+
+    setReportData(record.reportData);
+    setCurrentReportId(record.id);
+    setIsReportModified(false);
+    showToast(`✓ Loaded Report: ${record.customerName || 'Applicant'} (${record.id})`);
+  };
+
+  const handleNewReport = () => {
+    if (isReportModified) {
+      const confirmDiscard = window.confirm(
+        'You have unsaved changes in the current report. Start a new report anyway?'
+      );
+      if (!confirmDiscard) return;
+    }
+
+    setReportData(blankReport);
+    setCurrentReportId(null);
+    setIsReportModified(false);
+    showToast('Started new blank PD report');
+  };
+
   const handleLoadSample = (sampleType: 'kulwant' | 'rajesh' | 'blank') => {
+    if (isReportModified) {
+      const confirm = window.confirm('You have unsaved changes. Discard and load sample report?');
+      if (!confirm) return;
+    }
+    setCurrentReportId(null);
+    setIsReportModified(false);
     if (sampleType === 'kulwant') {
       setReportData(sampleKulwantSingh);
       showToast('Loaded Sample: Kulwant Singh (Beawar)');
@@ -161,6 +340,8 @@ export default function App() {
   const handleClear = () => {
     if (window.confirm('Are you sure you want to clear all form fields?')) {
       setReportData(blankReport);
+      setCurrentReportId(null);
+      setIsReportModified(false);
       showToast('All fields cleared');
     }
   };
@@ -244,6 +425,13 @@ export default function App() {
         viewMode={viewMode}
         setViewMode={setViewMode}
         reportData={reportData}
+        onSaveReport={handleSaveReport}
+        onOpenSavedReports={() => setIsSavedReportsModalOpen(true)}
+        onOpenUploadModal={() => setIsUploadModalOpen(true)}
+        isSavingReport={isSaving}
+        isReportModified={isReportModified}
+        currentReportId={currentReportId}
+        savedReportsCount={savedReportsCount}
       />
 
       {/* Floating Scannable Summary Ribbon (Screen Only) */}
@@ -254,6 +442,16 @@ export default function App() {
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               {reportData.customerName || 'Borrower'} · {reportData.shopNo ? `Shop ${reportData.shopNo}` : 'Unassigned'}
             </span>
+            {currentReportId ? (
+              <span className="text-[10px] bg-slate-700/80 text-emerald-300 font-mono px-1.5 py-0.5 rounded border border-emerald-500/30 flex items-center gap-1">
+                <span>DB ID: {currentReportId}</span>
+                {isReportModified && <span className="text-amber-300 font-bold">• (Unsaved)</span>}
+              </span>
+            ) : (
+              <span className="text-[10px] bg-slate-700/60 text-slate-400 font-mono px-1.5 py-0.5 rounded border border-slate-600">
+                {isReportModified ? 'Draft • Unsaved' : 'Draft'}
+              </span>
+            )}
             <span className="text-slate-500">|</span>
             <span>Family Members: <strong className="text-slate-200">{totalFamilyCount || '0'}</strong></span>
             {reportData.cibilAppScore && reportData.cibilAppScore.trim() !== '' && (
@@ -428,6 +626,35 @@ export default function App() {
           <span>{toastMessage}</span>
         </div>
       )}
+
+      {/* Saved Reports Database Management Modal */}
+      <SavedReportsModal
+        isOpen={isSavedReportsModalOpen}
+        onClose={() => setIsSavedReportsModalOpen(false)}
+        onOpenReport={handleOpenReport}
+        onNewReport={handleNewReport}
+        onOpenUploadModal={() => setIsUploadModalOpen(true)}
+        onReportsCountChange={(count) => setSavedReportsCount(count)}
+        currentReportId={currentReportId}
+      />
+
+      {/* Upload PDF / Report & Edit Modal */}
+      <UploadReportModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onLoadReport={handleLoadReportFromUpload}
+      />
+
+      {/* Strict Duplicate Warning Alert Modal */}
+      <DuplicateWarningModal
+        isOpen={Boolean(duplicateAlert)}
+        alertInfo={duplicateAlert}
+        onClose={() => setDuplicateAlert(null)}
+        onOpenSavedReports={() => {
+          setDuplicateAlert(null);
+          setIsSavedReportsModalOpen(true);
+        }}
+      />
     </div>
   );
 }

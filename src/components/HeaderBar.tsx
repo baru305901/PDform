@@ -11,7 +11,11 @@ import {
   ZoomOut,
   Maximize2,
   PenTool,
-  Type
+  Type,
+  Save,
+  FolderArchive,
+  Check,
+  Loader2
 } from 'lucide-react';
 import { PDReportData } from '../types';
 
@@ -30,6 +34,13 @@ interface HeaderBarProps {
   viewMode: 'continuous' | 'p1' | 'p2' | 'p3' | 'split';
   setViewMode: (v: 'continuous' | 'p1' | 'p2' | 'p3' | 'split') => void;
   reportData: PDReportData;
+  onSaveReport?: () => void;
+  onOpenSavedReports?: () => void;
+  isSavingReport?: boolean;
+  isReportModified?: boolean;
+  currentReportId?: string | null;
+  savedReportsCount?: number;
+  onOpenUploadModal?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -46,7 +57,14 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   setFontMode,
   viewMode,
   setViewMode,
-  reportData
+  reportData,
+  onSaveReport,
+  onOpenSavedReports,
+  isSavingReport = false,
+  isReportModified = false,
+  currentReportId = null,
+  savedReportsCount = 0,
+  onOpenUploadModal
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -175,6 +193,62 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
         {/* Action Controls & Export Buttons */}
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {/* Upload PDF / Report Button */}
+          {onOpenUploadModal && (
+            <button
+              onClick={onOpenUploadModal}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition active:scale-95"
+              title="Upload PDF, JSON, or text report to automatically extract and populate form"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload PDF / Report</span>
+            </button>
+          )}
+
+          {/* Saved Reports / History Button */}
+          {onOpenSavedReports && (
+            <button
+              onClick={onOpenSavedReports}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-600 text-xs font-semibold shadow-xs transition active:scale-95"
+              title="Open saved reports history"
+            >
+              <FolderArchive className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Saved Reports</span>
+              {savedReportsCount > 0 ? (
+                <span className="text-[10px] bg-emerald-950/90 text-emerald-300 font-bold px-1.5 py-0.5 rounded-full border border-emerald-500/30 leading-none min-w-[18px] text-center shadow-xs">
+                  {savedReportsCount}
+                </span>
+              ) : (
+                <span className="text-[10px] bg-slate-800 text-slate-400 font-bold px-1.5 py-0.5 rounded-full border border-slate-700 leading-none min-w-[18px] text-center">
+                  0
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Save / Update Report Button */}
+          {onSaveReport && (
+            <button
+              onClick={onSaveReport}
+              disabled={isSavingReport}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md hover:shadow-emerald-500/25 transition active:scale-95 ring-1 ring-white/20 disabled:opacity-50"
+              title={currentReportId ? `Update current report (${currentReportId}) in database` : 'Save report to permanent database'}
+            >
+              {isSavingReport ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              <span>{currentReportId ? 'Update Report' : 'Save Report'}</span>
+              {isReportModified && (
+                <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse" title="Unsaved changes"></span>
+              )}
+            </button>
+          )}
+
           {/* Preset Samples */}
           <div className="relative inline-block text-left group">
             <button
