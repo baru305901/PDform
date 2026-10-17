@@ -15,7 +15,9 @@ import {
   Save,
   FolderArchive,
   Check,
-  Loader2
+  Loader2,
+  PlusCircle,
+  FilePlus2
 } from 'lucide-react';
 import { PDReportData } from '../types';
 
@@ -34,6 +36,7 @@ interface HeaderBarProps {
   viewMode: 'continuous' | 'p1' | 'p2' | 'p3' | 'split';
   setViewMode: (v: 'continuous' | 'p1' | 'p2' | 'p3' | 'split') => void;
   reportData: PDReportData;
+  onNewReport?: () => void;
   onSaveReport?: () => void;
   onOpenSavedReports?: () => void;
   isSavingReport?: boolean;
@@ -58,6 +61,7 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   viewMode,
   setViewMode,
   reportData,
+  onNewReport,
   onSaveReport,
   onOpenSavedReports,
   isSavingReport = false,
@@ -115,6 +119,16 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
           {/* Quick preset selector on mobile */}
           <div className="flex md:hidden items-center gap-1.5">
+            {onNewReport && (
+              <button
+                type="button"
+                onClick={onNewReport}
+                className="text-xs bg-blue-600 hover:bg-blue-500 text-white px-2 py-1 rounded font-bold transition active:scale-95 shadow-sm"
+                title="Start a fresh blank PD visit report"
+              >
+                + New
+              </button>
+            )}
             {onFitToWidth && (
               <button
                 type="button"
@@ -193,6 +207,19 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
 
         {/* Action Controls & Export Buttons */}
         <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+          {/* New Sheet / New Report Button */}
+          {onNewReport && (
+            <button
+              onClick={onNewReport}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-xs transition active:scale-95 ring-1 ring-sky-400/40"
+              title="Start a fresh blank PD visit sheet (clears form, SKOP, family, income, CIBIL, signatures)"
+            >
+              <FilePlus2 className="w-3.5 h-3.5" />
+              <span>New Sheet</span>
+            </button>
+          )}
+
           {/* Upload PDF / Report Button */}
           {onOpenUploadModal && (
             <button

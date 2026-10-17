@@ -212,5 +212,6 @@ export const blankReport: PDReportData = {
   dirWest: 'Same as document',
   propertySize: 'SAME AS PATTA',
   pdAuthorisedPerson: '',
+  signatureDataUrl: '',
   signDate: new Date().toLocaleDateString('en-GB')
 };

@@ -307,15 +307,71 @@ export default function App() {
   const handleNewReport = () => {
     if (isReportModified) {
       const confirmDiscard = window.confirm(
-        'You have unsaved changes in the current report. Start a new report anyway?'
+        'You have unsaved changes. Start a new sheet?'
       );
       if (!confirmDiscard) return;
     }
 
-    setReportData(blankReport);
+    setReportData({
+      ...blankReport,
+      shopNo: '',
+      customerName: '',
+      visitDate: new Date().toLocaleDateString('en-GB'),
+      visitLocation: '',
+      propertyAddress: '',
+      permanentAddress: '',
+      contactNumbers: '',
+      distNearestBranch: '',
+      distSourcingBranch: '',
+      businessNameAddress: '',
+      businessVintage: '',
+      monthlyIncomeDetails: '',
+      considerIncomeDetails: '',
+      neighbourRef1: '',
+      neighbourRef2: '',
+      businessRef1: '',
+      businessRef2: '',
+      familyMembers: Array.from({ length: 10 }, (_, i) => ({
+        id: `${i + 1}`,
+        name: '',
+        prefix: '',
+        guardianName: '',
+        age: '',
+        relation: '',
+        business: ''
+      })),
+      masterTreeNotes: '',
+      guarantorDetail: 'Guarantor Not Add at PD Visit Time',
+      cibilAppName: '',
+      cibilAppScore: '',
+      cibilCoApp1Name: '',
+      cibilCoApp1Score: '',
+      cibilCoApp2Name: '',
+      cibilCoApp2Score: '',
+      cibilCoApp3Name: '',
+      cibilCoApp3Score: '',
+      existingLoans: '',
+      runningObligations: '',
+      assetVehicleDetails: '',
+      legalStatus: 'Perfect',
+      propertyTitle: '',
+      propertyOwner: '',
+      electricityDetails: '',
+      marketValue: '',
+      endUseLoan: '',
+      monthlyEmiPaid: '',
+      waiver: '',
+      requiredDocs: '',
+      deviationFindings: '',
+      remarksNotes: '',
+      mitigateNotes: '',
+      pdAuthorisedPerson: '',
+      signatureDataUrl: '',
+      signDate: new Date().toLocaleDateString('en-GB')
+    });
     setCurrentReportId(null);
     setIsReportModified(false);
-    showToast('Started new blank PD report');
+    showToast('✓ Started fresh blank PD sheet');
   };
 
   const handleLoadSample = (sampleType: 'kulwant' | 'rajesh' | 'blank') => {
@@ -425,6 +481,7 @@ export default function App() {
         viewMode={viewMode}
         setViewMode={setViewMode}
         reportData={reportData}
+        onNewReport={handleNewReport}
         onSaveReport={handleSaveReport}
         onOpenSavedReports={() => setIsSavedReportsModalOpen(true)}
         onOpenUploadModal={() => setIsUploadModalOpen(true)}
@@ -487,7 +544,16 @@ export default function App() {
       <div className="flex w-full max-w-full justify-center overflow-x-hidden min-w-0">
         {/* Split Screen Sidebar Editor */}
         {viewMode === 'split' && (
-          <FormEditorSidebar data={reportData} onChange={handleFieldChange} />
+          <FormEditorSidebar
+            data={reportData}
+            onChange={handleFieldChange}
+            onNewReport={handleNewReport}
+            onSaveReport={handleSaveReport}
+            onOpenUploadModal={() => setIsUploadModalOpen(true)}
+            isSavingReport={isSaving}
+            isReportModified={isReportModified}
+            currentReportId={currentReportId}
+          />
         )}
 
         {/* Paper Document Canvas Outer Scrollable Container */}

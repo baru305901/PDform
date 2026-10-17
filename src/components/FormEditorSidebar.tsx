@@ -11,19 +11,87 @@ import {
   Phone,
   Calendar,
   MapPin,
-  Briefcase
+  Briefcase,
+  FilePlus2,
+  Upload,
+  Save,
+  Loader2
 } from 'lucide-react';
 
 interface FormEditorSidebarProps {
   data: PDReportData;
   onChange: <K extends keyof PDReportData>(key: K, value: PDReportData[K]) => void;
+  onNewReport?: () => void;
+  onSaveReport?: () => void;
+  onOpenUploadModal?: () => void;
+  isSavingReport?: boolean;
+  isReportModified?: boolean;
+  currentReportId?: string | null;
 }
 
-export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({ data, onChange }) => {
+export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({
+  data,
+  onChange,
+  onNewReport,
+  onSaveReport,
+  onOpenUploadModal,
+  isSavingReport = false,
+  isReportModified = false,
+  currentReportId = null
+}) => {
   const [activeSection, setActiveSection] = useState<'applicant' | 'income' | 'credit' | 'property'>('applicant');
 
   return (
     <div className="no-print bg-slate-900 border-r border-slate-800 text-slate-200 w-full lg:w-[420px] shrink-0 h-[calc(100vh-60px)] sticky top-[60px] overflow-y-auto flex flex-col p-4 shadow-xl">
+      {/* Quick Action Controls: New Sheet, Upload, Save */}
+      {(onNewReport || onOpenUploadModal || onSaveReport) && (
+        <div className="bg-slate-800/80 p-1.5 rounded-lg border border-slate-700/80 mb-3 flex items-center justify-between gap-1.5">
+          {onNewReport && (
+            <button
+              type="button"
+              onClick={onNewReport}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-sky-600 hover:bg-sky-500 text-white text-xs font-bold shadow-xs transition active:scale-95"
+              title="Start a fresh blank PD visit sheet"
+            >
+              <FilePlus2 className="w-3.5 h-3.5" />
+              <span>New Sheet</span>
+            </button>
+          )}
+
+          {onOpenUploadModal && (
+            <button
+              type="button"
+              onClick={onOpenUploadModal}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition active:scale-95"
+              title="Upload PDF, text, or JSON report to extract and fill form"
+            >
+              <Upload className="w-3.5 h-3.5" />
+              <span>Upload</span>
+            </button>
+          )}
+
+          {onSaveReport && (
+            <button
+              type="button"
+              onClick={onSaveReport}
+              disabled={isSavingReport}
+              className="flex-1 inline-flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-xs transition active:scale-95 disabled:opacity-50"
+              title={currentReportId ? `Update report (${currentReportId}) in database` : 'Save report to database'}
+            >
+              {isSavingReport ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <Save className="w-3.5 h-3.5" />
+              )}
+              <span>{currentReportId ? 'Update' : 'Save'}</span>
+              {isReportModified && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse" title="Unsaved changes"></span>
+              )}
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Navigation tabs */}
       <div className="grid grid-cols-4 gap-1 p-1 bg-slate-800 rounded-lg mb-4 text-xs font-semibold">
         <button
