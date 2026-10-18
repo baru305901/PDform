@@ -215,3 +215,80 @@ export const blankReport: PDReportData = {
   signatureDataUrl: '',
   signDate: new Date().toLocaleDateString('en-GB')
 };
+
+export function createFreshBlankReport(
+  session?: { branchName?: string; officerName?: string } | null
+): PDReportData {
+  const branch = (session?.branchName || '').trim();
+  const officer = (session?.officerName || '').replace(/Kuamar/gi, 'Kumar').trim();
+  const today = new Date().toLocaleDateString('en-GB');
+
+  return {
+    ...blankReport,
+    shopNo: '',
+    customerName: '',
+    visitDate: today,
+    visitLocation: '',
+    propertyAddress: '',
+    permanentAddress: '',
+    contactNumbers: '',
+    distNearestBranch: '',
+    distSourcingBranch: branch,
+    branchName: branch,
+    officerName: officer,
+    branch_name: branch,
+    officer_name: officer,
+    businessNameAddress: '',
+    businessVintage: '',
+    businessPremises: '',
+    monthlyIncomeDetails: '',
+    considerIncomeDetails: '',
+    neighbourRef1: '',
+    neighbourRef2: '',
+    businessRef1: '',
+    businessRef2: '',
+    familyMembers: Array.from({ length: 10 }, (_, i) => ({
+      id: `${i + 1}`,
+      name: '',
+      prefix: '',
+      guardianName: '',
+      age: '',
+      relation: '',
+      business: ''
+    })),
+    masterTreeNotes: '',
+    guarantorDetail: 'Guarantor Not Add at PD Visit Time',
+    cibilAppName: '',
+    cibilAppScore: '',
+    cibilCoApp1Name: '',
+    cibilCoApp1Score: '',
+    cibilCoApp2Name: '',
+    cibilCoApp2Score: '',
+    cibilCoApp3Name: '',
+    cibilCoApp3Score: '',
+    existingLoans: '',
+    runningObligations: '',
+    assetVehicleDetails: '',
+    legalStatus: 'Perfect',
+    propertyTitle: '',
+    propertyOwner: '',
+    electricityDetails: '',
+    marketValue: '',
+    endUseLoan: '',
+    monthlyEmiPaid: '',
+    waiver: '',
+    requiredDocs: '',
+    deviationFindings: '',
+    remarksNotes: '',
+    mitigateNotes: '',
+    recommendation: 'Recommended',
+    dirNorth: 'Same as document',
+    dirSouth: 'Same as document',
+    dirEast: 'Same as document',
+    dirWest: 'Same as document',
+    propertySize: 'SAME AS PATTA',
+    pdAuthorisedPerson: officer,
+    signatureDataUrl: '',
+    signDate: today
+  };
+}

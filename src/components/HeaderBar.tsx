@@ -19,7 +19,8 @@ import {
   PlusCircle,
   FilePlus2,
   Building2,
-  User
+  User,
+  LogOut
 } from 'lucide-react';
 import { PDReportData } from '../types';
 
@@ -48,6 +49,7 @@ interface HeaderBarProps {
   onOpenUploadModal?: () => void;
   activeOfficerSession?: { branchName: string; officerName: string } | null;
   onOpenOfficerModal?: () => void;
+  onLogout?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -74,7 +76,8 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   savedReportsCount = 0,
   onOpenUploadModal,
   activeOfficerSession,
-  onOpenOfficerModal
+  onOpenOfficerModal,
+  onLogout
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -123,21 +126,40 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
             </div>
           </div>
 
-          {/* Active Branch & Officer indicator (clickable to switch) */}
-          {onOpenOfficerModal && (
-            <button
-              type="button"
-              onClick={onOpenOfficerModal}
-              className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border border-slate-700/80 hover:border-blue-500/50 text-xs transition active:scale-95 group shadow-xs ml-1"
-              title="Click to switch Branch or Officer"
-            >
-              <Building2 className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-300" />
-              <span className="font-semibold text-white">{activeOfficerSession?.branchName || 'Select Branch'}</span>
-              <span className="text-slate-500">|</span>
-              <User className="w-3.5 h-3.5 text-indigo-400 group-hover:text-indigo-300" />
-              <span className="text-slate-300 font-medium">{activeOfficerSession?.officerName || 'Credit Officer'}</span>
-            </button>
-          )}
+          {/* Active Branch & Officer indicator (clickable to switch) & Log Out */}
+          <div className="flex items-center gap-1.5 ml-1">
+            {onOpenOfficerModal && (
+              <button
+                type="button"
+                onClick={onOpenOfficerModal}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border border-slate-700/80 hover:border-blue-500/50 text-xs transition active:scale-95 group shadow-xs"
+                title="Click to switch Branch or Officer (resets form to fresh clean slate)"
+              >
+                <Building2 className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-300 shrink-0" />
+                <span className="font-semibold text-white hidden sm:inline">{activeOfficerSession?.branchName || 'Select Branch'}</span>
+                <span className="text-slate-500 hidden sm:inline">|</span>
+                <User className="w-3.5 h-3.5 text-indigo-400 group-hover:text-indigo-300 shrink-0" />
+                <span className="text-slate-300 font-medium truncate max-w-[110px] sm:max-w-none">
+                  {activeOfficerSession?.officerName || 'Credit Officer'}
+                </span>
+                <span className="text-[10px] text-blue-400/80 uppercase font-semibold hidden md:inline ml-0.5">
+                  (Switch)
+                </span>
+              </button>
+            )}
+
+            {onLogout && activeOfficerSession && (
+              <button
+                type="button"
+                onClick={onLogout}
+                className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-800/80 hover:bg-red-950/70 text-slate-400 hover:text-red-300 border border-slate-700/80 hover:border-red-500/50 text-xs transition active:scale-95 shadow-xs"
+                title="Log out and reset session to clean blank slate"
+              >
+                <LogOut className="w-3.5 h-3.5 text-slate-400 hover:text-red-300" />
+                <span className="hidden sm:inline font-medium">Log Out</span>
+              </button>
+            )}
+          </div>
 
           {/* Quick preset selector on mobile */}
           <div className="flex md:hidden items-center gap-1.5">

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Building2, User, Check, ArrowRight, ShieldCheck, Sparkles, X } from 'lucide-react';
+import { Building2, User, Check, ArrowRight, ShieldCheck, Sparkles, X, LogOut } from 'lucide-react';
 
 export interface OfficerSession {
   branchName: string;
@@ -60,10 +60,19 @@ export function saveStoredOfficerSession(session: OfficerSession): void {
   }
 }
 
+export function clearStoredOfficerSession(): void {
+  try {
+    localStorage.removeItem(OFFICER_SESSION_STORAGE_KEY);
+  } catch (e) {
+    console.warn('Error clearing officer session:', e);
+  }
+}
+
 interface BranchOfficerModalProps {
   isOpen: boolean;
   onClose?: () => void;
   onConfirm: (session: OfficerSession) => void;
+  onLogout?: () => void;
   initialSession?: OfficerSession | null;
   mode?: 'startup' | 'new_sheet' | 'switch';
 }
@@ -72,6 +81,7 @@ export const BranchOfficerModal: React.FC<BranchOfficerModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
+  onLogout,
   initialSession,
   mode = 'startup'
 }) => {
@@ -269,24 +279,40 @@ export const BranchOfficerModal: React.FC<BranchOfficerModalProps> = ({
           </div>
 
           {/* Action Buttons */}
-          <div className="pt-2 flex items-center justify-end gap-2.5">
-            {onClose && mode !== 'startup' && (
+          <div className="pt-2 flex items-center justify-between gap-2.5">
+            {onLogout && mode === 'switch' ? (
               <button
                 type="button"
-                onClick={onClose}
-                className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition"
+                onClick={onLogout}
+                className="px-3.5 py-2 text-xs font-semibold text-red-300 hover:text-white bg-red-950/40 hover:bg-red-900/60 rounded-xl border border-red-500/40 transition flex items-center gap-1.5"
+                title="Log out and reset session to clean slate"
               >
-                Cancel
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Log Out Session</span>
               </button>
+            ) : (
+              <div />
             )}
 
-            <button
-              type="submit"
-              className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/25 transition active:scale-95 inline-flex items-center gap-2 ring-1 ring-white/20"
-            >
-              <span>{mode === 'new_sheet' ? 'Start New Sheet' : 'Proceed to PD Report'}</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              {onClose && mode !== 'startup' && (
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="px-4 py-2 text-xs font-semibold text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition"
+                >
+                  Cancel
+                </button>
+              )}
+
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/25 transition active:scale-95 inline-flex items-center gap-2 ring-1 ring-white/20"
+              >
+                <span>{mode === 'new_sheet' ? 'Start New Sheet' : 'Proceed to PD Report'}</span>
+                <ArrowRight className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </form>
       </div>

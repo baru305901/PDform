@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PDReportData, FamilyMember, SavedReportRecord } from './types';
-import { sampleKulwantSingh, sampleRajeshSharma, blankReport } from './sampleData';
+import { sampleKulwantSingh, sampleRajeshSharma, blankReport, createFreshBlankReport } from './sampleData';
 import { HeaderBar } from './components/HeaderBar';
 import { Page1Report } from './components/Page1Report';
 import { Page2Report } from './components/Page2Report';
@@ -14,7 +14,12 @@ import { FormEditorSidebar } from './components/FormEditorSidebar';
 import { SavedReportsModal } from './components/SavedReportsModal';
 import { UploadReportModal } from './components/UploadReportModal';
 import { DuplicateWarningModal, DuplicateAlertInfo } from './components/DuplicateWarningModal';
-import { BranchOfficerModal, OfficerSession, getStoredOfficerSession } from './components/BranchOfficerModal';
+import {
+  BranchOfficerModal,
+  OfficerSession,
+  getStoredOfficerSession,
+  clearStoredOfficerSession
+} from './components/BranchOfficerModal';
 import {
   saveReport,
   fetchAllReports,
@@ -48,17 +53,20 @@ export default function App() {
   const [officerSession, setOfficerSession] = useState<OfficerSession | null>(getStoredOfficerSession);
   const [isOfficerModalOpen, setIsOfficerModalOpen] = useState<boolean>(false);
   const [officerModalMode, setOfficerModalMode] = useState<'startup' | 'new_sheet' | 'switch'>('startup');
-  // Load saved state or default to sampleKulwantSingh
+  // Load saved state if active session exists, or default to a fresh clean blank report
   const [reportData, setReportData] = useState<PDReportData>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved) {
-        return JSON.parse(saved);
+    const session = getStoredOfficerSession();
+    if (session) {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (e) {
+        console.error('Error loading saved PD report data:', e);
       }
-    } catch (e) {
-      console.error('Error loading saved PD report data:', e);
     }
-    return sampleKulwantSingh;
+    return createFreshBlankReport(session);
   });
 
   const [zoom, setZoom] = useState<number>(1.0);
@@ -388,69 +396,16 @@ export default function App() {
   };
 
   const executeStartNewSheet = (session: OfficerSession) => {
-    setReportData({
-      ...blankReport,
-      shopNo: '',
-      customerName: '',
-      visitDate: new Date().toLocaleDateString('en-GB'),
-      visitLocation: '',
-      propertyAddress: '',
-      permanentAddress: '',
-      contactNumbers: '',
-      distNearestBranch: '',
-      distSourcingBranch: session.branchName || '',
-      branchName: session.branchName || '',
-      officerName: session.officerName || '',
-      branch_name: session.branchName || '',
-      officer_name: session.officerName || '',
-      businessNameAddress: '',
-      businessVintage: '',
-      monthlyIncomeDetails: '',
-      considerIncomeDetails: '',
-      neighbourRef1: '',
-      neighbourRef2: '',
-      businessRef1: '',
-      businessRef2: '',
-      familyMembers: Array.from({ length: 10 }, (_, i) => ({
-        id: `${i + 1}`,
-        name: '',
-        prefix: '',
-        guardianName: '',
-        age: '',
-        relation: '',
-        business: ''
-      })),
-      masterTreeNotes: '',
-      guarantorDetail: 'Guarantor Not Add at PD Visit Time',
-      cibilAppName: '',
-      cibilAppScore: '',
-      cibilCoApp1Name: '',
-      cibilCoApp1Score: '',
-      cibilCoApp2Name: '',
-      cibilCoApp2Score: '',
-      cibilCoApp3Name: '',
-      cibilCoApp3Score: '',
-      existingLoans: '',
-      runningObligations: '',
-      assetVehicleDetails: '',
-      legalStatus: 'Perfect',
-      propertyTitle: '',
-      propertyOwner: '',
-      electricityDetails: '',
-      marketValue: '',
-      endUseLoan: '',
-      monthlyEmiPaid: '',
-      waiver: '',
-      requiredDocs: '',
-      deviationFindings: '',
-      remarksNotes: '',
-      mitigateNotes: '',
-      pdAuthorisedPerson: session.officerName || '',
-      signatureDataUrl: '',
-      signDate: new Date().toLocaleDateString('en-GB')
-    });
+    setReportData(createFreshBlankReport(session));
     setCurrentReportId(null);
     setIsReportModified(false);
+    setDuplicateAlert(null);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(ACTIVE_REPORT_ID_KEY);
+    } catch {
+      // ignore
+    }
     showToast(`✓ Started fresh blank PD sheet for ${session.officerName} (${session.branchName})`);
   };
 
@@ -471,31 +426,52 @@ export default function App() {
     setOfficerSession(session);
     setIsOfficerModalOpen(false);
 
-    if (officerModalMode === 'new_sheet') {
-      executeStartNewSheet(session);
-    } else if (officerModalMode === 'startup') {
-      // Auto-tag current report if it lacks branch/officer
-      setReportData((prev) => ({
-        ...prev,
-        branchName: prev.branchName || session.branchName,
-        officerName: prev.officerName || session.officerName,
-        branch_name: prev.branch_name || session.branchName,
-        officer_name: prev.officer_name || session.officerName,
-        pdAuthorisedPerson: prev.pdAuthorisedPerson || session.officerName
-      }));
-      showToast(`Welcome ${session.officerName} · Branch: ${session.branchName}`);
-    } else {
-      // mode === 'switch'
-      setReportData((prev) => ({
-        ...prev,
-        branchName: session.branchName,
-        officerName: session.officerName,
-        branch_name: session.branchName,
-        officer_name: session.officerName,
-        pdAuthorisedPerson: prev.pdAuthorisedPerson || session.officerName
-      }));
-      showToast(`Switched active officer to ${session.officerName} (${session.branchName})`);
+    // CRITICAL: Always reset the report editor to a completely fresh, blank form state
+    // on startup login, new sheet, or session switch - zero carryover of previous customer data!
+    const freshData = createFreshBlankReport(session);
+    setReportData(freshData);
+    setCurrentReportId(null);
+    setIsReportModified(false);
+    setDuplicateAlert(null);
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(ACTIVE_REPORT_ID_KEY);
+    } catch {
+      // ignore
     }
+
+    if (officerModalMode === 'new_sheet') {
+      showToast(`✓ Started fresh blank PD sheet for ${session.officerName} (${session.branchName})`);
+    } else if (officerModalMode === 'startup') {
+      showToast(`Welcome ${session.officerName} (${session.branchName}) · Form reset to clean slate`);
+    } else {
+      showToast(`Switched active officer to ${session.officerName} (${session.branchName}) · Clean slate ready`);
+    }
+  };
+
+  const handleLogout = () => {
+    if (isReportModified) {
+      const confirmDiscard = window.confirm(
+        'You have unsaved changes in the current report. Logging out will discard unsaved draft changes. Proceed with logout?'
+      );
+      if (!confirmDiscard) return;
+    }
+
+    clearStoredOfficerSession();
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(ACTIVE_REPORT_ID_KEY);
+    } catch {
+      // ignore
+    }
+    setOfficerSession(null);
+    setCurrentReportId(null);
+    setIsReportModified(false);
+    setDuplicateAlert(null);
+    setReportData(createFreshBlankReport(null));
+    setOfficerModalMode('startup');
+    setIsOfficerModalOpen(true);
+    showToast('Logged out successfully. All form fields reset to clean slate.');
   };
 
   const handleLoadSample = (sampleType: 'kulwant' | 'rajesh' | 'blank') => {
@@ -519,17 +495,24 @@ export default function App() {
       showToast('Loaded Sample: Rajesh Sharma (Jaipur)');
     } else {
       setCurrentReportId(null);
-      setReportData(blankReport);
+      setReportData(createFreshBlankReport(officerSession));
       showToast('Loaded Blank Form Template');
     }
   };
 
   const handleClear = () => {
     if (window.confirm('Are you sure you want to clear all form fields?')) {
-      setReportData(blankReport);
+      setReportData(createFreshBlankReport(officerSession));
       setCurrentReportId(null);
       setIsReportModified(false);
-      showToast('All fields cleared');
+      setDuplicateAlert(null);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(ACTIVE_REPORT_ID_KEY);
+      } catch {
+        // ignore
+      }
+      showToast('All fields cleared to fresh blank sheet');
     }
   };
 
@@ -625,6 +608,7 @@ export default function App() {
           setOfficerModalMode('switch');
           setIsOfficerModalOpen(true);
         }}
+        onLogout={handleLogout}
       />
 
       {/* Floating Scannable Summary Ribbon (Screen Only) */}
@@ -883,6 +867,7 @@ export default function App() {
         isOpen={isOfficerModalOpen}
         onClose={() => setIsOfficerModalOpen(false)}
         onConfirm={handleConfirmOfficerSession}
+        onLogout={handleLogout}
         initialSession={officerSession}
         mode={officerModalMode}
       />
