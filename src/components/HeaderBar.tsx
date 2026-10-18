@@ -17,7 +17,9 @@ import {
   Check,
   Loader2,
   PlusCircle,
-  FilePlus2
+  FilePlus2,
+  Building2,
+  User
 } from 'lucide-react';
 import { PDReportData } from '../types';
 
@@ -44,6 +46,8 @@ interface HeaderBarProps {
   currentReportId?: string | null;
   savedReportsCount?: number;
   onOpenUploadModal?: () => void;
+  activeOfficerSession?: { branchName: string; officerName: string } | null;
+  onOpenOfficerModal?: () => void;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -68,7 +72,9 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   isReportModified = false,
   currentReportId = null,
   savedReportsCount = 0,
-  onOpenUploadModal
+  onOpenUploadModal,
+  activeOfficerSession,
+  onOpenOfficerModal
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -116,6 +122,22 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               </p>
             </div>
           </div>
+
+          {/* Active Branch & Officer indicator (clickable to switch) */}
+          {onOpenOfficerModal && (
+            <button
+              type="button"
+              onClick={onOpenOfficerModal}
+              className="hidden lg:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700/90 text-slate-200 border border-slate-700/80 hover:border-blue-500/50 text-xs transition active:scale-95 group shadow-xs ml-1"
+              title="Click to switch Branch or Officer"
+            >
+              <Building2 className="w-3.5 h-3.5 text-blue-400 group-hover:text-blue-300" />
+              <span className="font-semibold text-white">{activeOfficerSession?.branchName || 'Select Branch'}</span>
+              <span className="text-slate-500">|</span>
+              <User className="w-3.5 h-3.5 text-indigo-400 group-hover:text-indigo-300" />
+              <span className="text-slate-300 font-medium">{activeOfficerSession?.officerName || 'Credit Officer'}</span>
+            </button>
+          )}
 
           {/* Quick preset selector on mobile */}
           <div className="flex md:hidden items-center gap-1.5">

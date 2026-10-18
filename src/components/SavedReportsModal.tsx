@@ -25,7 +25,10 @@ import {
   ArrowDown,
   Clock,
   Plus,
-  Upload
+  Upload,
+  User,
+  Building2,
+  UserCheck
 } from 'lucide-react';
 
 interface SavedReportsModalProps {
@@ -36,6 +39,7 @@ interface SavedReportsModalProps {
   onOpenUploadModal?: () => void;
   onReportsCountChange?: (count: number) => void;
   currentReportId: string | null;
+  activeOfficerSession?: { branchName: string; officerName: string } | null;
 }
 
 type SortField = 'visitDate' | 'customerName' | 'updatedAt';
@@ -48,7 +52,8 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
   onNewReport,
   onOpenUploadModal,
   onReportsCountChange,
-  currentReportId
+  currentReportId,
+  activeOfficerSession
 }) => {
   const [reports, setReports] = useState<SavedReportRecord[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -61,6 +66,8 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
   const [filterApplicant, setFilterApplicant] = useState('');
   const [filterSkop, setFilterSkop] = useState('');
   const [filterLocation, setFilterLocation] = useState('');
+  const [filterOfficer, setFilterOfficer] = useState('');
+  const [filterBranch, setFilterBranch] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
@@ -103,11 +110,41 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
     onReportsCountChange?.(reports.length);
   }, [reports, onReportsCountChange]);
 
+  // Dynamically extract all distinct officers & branches from saved reports
+  const uniqueOfficers = useMemo(() => {
+    const set = new Set<string>();
+    reports.forEach((r) => {
+      const off =
+        r.officerName ||
+        r.officer_name ||
+        r.reportData?.officerName ||
+        r.reportData?.officer_name ||
+        r.reportData?.pdAuthorisedPerson;
+      if (off && off.trim()) set.add(off.trim());
+    });
+    return Array.from(set).sort();
+  }, [reports]);
+
+  const uniqueBranches = useMemo(() => {
+    const set = new Set<string>();
+    reports.forEach((r) => {
+      const br =
+        r.branchName ||
+        r.branch_name ||
+        r.reportData?.branchName ||
+        r.reportData?.branch_name;
+      if (br && br.trim()) set.add(br.trim());
+    });
+    return Array.from(set).sort();
+  }, [reports]);
+
   const handleClearFilters = () => {
     setSearchTerm('');
     setFilterApplicant('');
     setFilterSkop('');
     setFilterLocation('');
+    setFilterOfficer('');
+    setFilterBranch('');
     setFilterDateFrom('');
     setFilterDateTo('');
     setCurrentPage(1);
@@ -126,7 +163,24 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
   // Filter & Search Logic
   const filteredReports = useMemo(() => {
     return reports.filter((item) => {
-      // 1. Global search term (Applicant, Date, SKOP, Location, Mobile, ID)
+      const reportOfficer = (
+        item.officerName ||
+        item.officer_name ||
+        item.reportData?.officerName ||
+        item.reportData?.officer_name ||
+        item.reportData?.pdAuthorisedPerson ||
+        ''
+      ).trim();
+
+      const reportBranch = (
+        item.branchName ||
+        item.branch_name ||
+        item.reportData?.branchName ||
+        item.reportData?.branch_name ||
+        ''
+      ).trim();
+
+      // 1. Global search term (Applicant, Date, SKOP, Location, Mobile, Officer, Branch, ID)
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase().trim();
         const matchesGlobal =
@@ -135,6 +189,8 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
           (item.visitDate || '').toLowerCase().includes(q) ||
           (item.visitLocation || '').toLowerCase().includes(q) ||
           (item.contactNumbers || '').toLowerCase().includes(q) ||
+          reportOfficer.toLowerCase().includes(q) ||
+          reportBranch.toLowerCase().includes(q) ||
           (item.id || '').toLowerCase().includes(q);
 
         if (!matchesGlobal) return false;
@@ -159,16 +215,33 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
         }
       }
 
-      if (filterDateFrom.trim()) {
-        if (item.visitDate < filterDateFrom) {
-          // If in DD/MM/YYYY or YYYY-MM-DD
-          // Let's do a substring or standard check
+      // Officer Filter
+      if (filterOfficer.trim()) {
+        if (!reportOfficer.toLowerCase().includes(filterOfficer.toLowerCase().trim())) {
+          return false;
+        }
+      }
+
+      // Branch Filter
+      if (filterBranch.trim()) {
+        if (!reportBranch.toLowerCase().includes(filterBranch.toLowerCase().trim())) {
+          return false;
         }
       }
 
       return true;
     });
-  }, [reports, searchTerm, filterApplicant, filterSkop, filterLocation, filterDateFrom, filterDateTo]);
+  }, [
+    reports,
+    searchTerm,
+    filterApplicant,
+    filterSkop,
+    filterLocation,
+    filterOfficer,
+    filterBranch,
+    filterDateFrom,
+    filterDateTo
+  ]);
 
   // Sort Logic
   const sortedReports = useMemo(() => {
@@ -320,7 +393,7 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
                   setSearchTerm(e.target.value);
                   setCurrentPage(1);
                 }}
-                placeholder="Search by Applicant, SKOP No., Date, Location, Mobile, or Report ID..."
+                placeholder="Search by Applicant, Officer, Branch, SKOP No., Date, Location, Mobile, ID..."
                 className="w-full pl-9 pr-8 py-2 bg-slate-950 border border-slate-700 rounded-lg text-xs sm:text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-emerald-500"
               />
               {searchTerm && (
@@ -333,20 +406,46 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
               )}
             </div>
 
-            {/* Filter Toggle & Clear */}
-            <div className="flex items-center gap-2">
+            {/* Quick My Reports Filter & Filter Toggle & Clear */}
+            <div className="flex flex-wrap items-center gap-2">
+              {activeOfficerSession?.officerName && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (filterOfficer === activeOfficerSession.officerName) {
+                      setFilterOfficer('');
+                    } else {
+                      setFilterOfficer(activeOfficerSession.officerName);
+                    }
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-all flex items-center gap-1.5 ${
+                    filterOfficer === activeOfficerSession.officerName
+                      ? 'bg-indigo-600 text-white border-indigo-500 shadow-md ring-1 ring-indigo-400/50'
+                      : 'bg-slate-800 text-indigo-300 hover:text-white border-indigo-500/30 hover:bg-slate-700'
+                  }`}
+                  title="Filter to show only reports tagged with your officer name"
+                >
+                  <UserCheck className="w-3.5 h-3.5" />
+                  <span>My Reports</span>
+                  {filterOfficer === activeOfficerSession.officerName && (
+                    <span className="text-[10px] bg-white/20 px-1 rounded font-bold">Active</span>
+                  )}
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
                 className={`px-3 py-2 text-xs font-semibold rounded-lg border transition-colors flex items-center gap-1.5 ${
-                  showAdvancedFilters || filterApplicant || filterSkop || filterLocation
+                  showAdvancedFilters || filterApplicant || filterSkop || filterLocation || filterOfficer || filterBranch
                     ? 'bg-blue-600/20 text-blue-300 border-blue-500/40'
                     : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
                 }`}
               >
                 <Filter className="w-3.5 h-3.5" />
                 <span>Filters</span>
-                {(filterApplicant || filterSkop || filterLocation) && (
+                {(filterApplicant || filterSkop || filterLocation || filterOfficer || filterBranch) && (
                   <span className="w-2 h-2 rounded-full bg-blue-400"></span>
                 )}
               </button>
@@ -363,7 +462,7 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
 
           {/* Collapsible Advanced Field Filters */}
           {showAdvancedFilters && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-slate-800/80 animate-fadeIn">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 pt-2 border-t border-slate-800/80 animate-fadeIn">
               <div>
                 <label className="text-[11px] font-semibold text-slate-400 block mb-1">
                   Applicant Name
@@ -378,6 +477,48 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
                   placeholder="e.g. Kulwant"
                   className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded text-xs text-slate-200 focus:outline-none focus:border-blue-500"
                 />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                  Officer Name
+                </label>
+                <select
+                  value={filterOfficer}
+                  onChange={(e) => {
+                    setFilterOfficer(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded text-xs text-slate-200 focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="">All Officers</option>
+                  {uniqueOfficers.map((off) => (
+                    <option key={off} value={off}>
+                      {off}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-semibold text-slate-400 block mb-1">
+                  Branch Name
+                </label>
+                <select
+                  value={filterBranch}
+                  onChange={(e) => {
+                    setFilterBranch(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="w-full px-2.5 py-1.5 bg-slate-950 border border-slate-700 rounded text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                >
+                  <option value="">All Branches</option>
+                  {uniqueBranches.map((br) => (
+                    <option key={br} value={br}>
+                      {br}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div>
@@ -514,6 +655,7 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
                       </div>
                     </th>
                     <th className="py-3 px-4">SKOP Number</th>
+                    <th className="py-3 px-4">Officer & Branch</th>
                     <th className="py-3 px-4">Location</th>
                     <th className="py-3 px-4">Mobile Number</th>
                     <th
@@ -575,6 +717,56 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
                         {/* SKOP Number */}
                         <td className="py-3 px-4 font-mono font-bold text-amber-400/90">
                           {record.shopNo || '-'}
+                        </td>
+
+                        {/* Officer & Branch */}
+                        <td className="py-3 px-4">
+                          {(() => {
+                            const offName =
+                              record.officerName ||
+                              record.officer_name ||
+                              record.reportData?.officerName ||
+                              record.reportData?.officer_name ||
+                              record.reportData?.pdAuthorisedPerson ||
+                              '';
+                            const brName =
+                              record.branchName ||
+                              record.branch_name ||
+                              record.reportData?.branchName ||
+                              record.reportData?.branch_name ||
+                              '';
+                            const isMyReport = Boolean(
+                              activeOfficerSession?.officerName &&
+                              offName &&
+                              offName.toLowerCase() === activeOfficerSession.officerName.toLowerCase()
+                            );
+
+                            return (
+                              <div className="space-y-0.5 max-w-[170px]">
+                                <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-200">
+                                  <User className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+                                  <span className="truncate" title={offName || 'Unassigned'}>
+                                    {offName || <span className="text-slate-500 font-normal italic">Unassigned</span>}
+                                  </span>
+                                  {isMyReport && (
+                                    <span className="text-[9px] bg-indigo-500/20 text-indigo-300 border border-indigo-500/40 px-1 rounded font-bold shrink-0">
+                                      You
+                                    </span>
+                                  )}
+                                </div>
+                                {brName ? (
+                                  <div className="flex items-center gap-1 text-[11px] text-slate-400">
+                                    <Building2 className="w-3 h-3 text-blue-400 shrink-0" />
+                                    <span className="truncate" title={brName}>
+                                      {brName}
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[10px] text-slate-600 italic">No branch</div>
+                                )}
+                              </div>
+                            );
+                          })()}
                         </td>
 
                         {/* Location */}

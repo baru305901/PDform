@@ -15,6 +15,10 @@ export interface SavedReportRecord {
   visitDate: string;
   visitLocation: string;
   contactNumbers: string;
+  branchName?: string;
+  officerName?: string;
+  branch_name?: string;
+  officer_name?: string;
   createdAt: string;
   updatedAt: string;
   reportData: PDReportData;
@@ -25,6 +29,10 @@ export interface PDReportData {
   shopNo: string;
   visitDate: string;
   visitLocation: string;
+  branchName?: string;
+  officerName?: string;
+  branch_name?: string;
+  officer_name?: string;
 
   // Borrower & Residence Details
   customerName: string;

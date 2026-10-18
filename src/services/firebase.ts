@@ -271,7 +271,8 @@ export async function validateReportUniqueness(
 
 export async function saveReport(
   reportData: PDReportData,
-  existingId?: string
+  existingId?: string,
+  officerContext?: { branchName?: string; officerName?: string }
 ): Promise<SavedReportRecord> {
   // Enforce strict duplicate validation before saving
   const validation = await validateReportUniqueness(reportData, existingId);
@@ -282,15 +283,36 @@ export async function saveReport(
   const now = new Date().toISOString();
   const id = existingId && existingId.trim() ? existingId.trim() : `SKPD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-  // If updating, preserve creation date if available
+  // If updating, preserve creation date and original branch/officer if not provided
   let createdAt = now;
+  let existingBranch = '';
+  let existingOfficer = '';
   if (existingId) {
     const cached = getLocalCache();
     const existing = cached.find((r) => r.id === existingId);
     if (existing?.createdAt) {
       createdAt = existing.createdAt;
+      existingBranch = existing.branchName || existing.branch_name || '';
+      existingOfficer = existing.officerName || existing.officer_name || '';
     }
   }
+
+  const branchName = (
+    reportData.branchName ||
+    reportData.branch_name ||
+    officerContext?.branchName ||
+    existingBranch ||
+    ''
+  ).trim();
+
+  const officerName = (
+    reportData.officerName ||
+    reportData.officer_name ||
+    officerContext?.officerName ||
+    existingOfficer ||
+    reportData.pdAuthorisedPerson ||
+    ''
+  ).trim();
 
   const record: SavedReportRecord = {
     id,
@@ -299,12 +321,21 @@ export async function saveReport(
     visitDate: reportData.visitDate || '',
     visitLocation: reportData.visitLocation || '',
     contactNumbers: reportData.contactNumbers || '',
+    branchName,
+    officerName,
+    branch_name: branchName,
+    officer_name: officerName,
     createdAt,
     updatedAt: now,
     reportData: {
       ...reportData,
       shopNo: reportData.shopNo || '',
-      customerName: reportData.customerName || 'Unnamed Applicant'
+      customerName: reportData.customerName || 'Unnamed Applicant',
+      branchName,
+      officerName,
+      branch_name: branchName,
+      officer_name: officerName,
+      pdAuthorisedPerson: reportData.pdAuthorisedPerson || officerName || ''
     }
   };
 
@@ -397,6 +428,10 @@ export async function duplicateReport(id: string): Promise<SavedReportRecord> {
     customerName: `${source.reportData.customerName || 'Applicant'} (Copy)`,
     shopNo: source.reportData.shopNo ? `${source.reportData.shopNo}-CP${uniqueSuffix}` : '',
     contactNumbers: '', // Cleared so it doesn't collide with the original applicant's verified phone
+    branchName: source.branchName || source.branch_name || source.reportData?.branchName || '',
+    officerName: source.officerName || source.officer_name || source.reportData?.officerName || '',
+    branch_name: source.branchName || source.branch_name || source.reportData?.branchName || '',
+    officer_name: source.officerName || source.officer_name || source.reportData?.officerName || '',
   };
 
   return await saveReport(duplicatedData);

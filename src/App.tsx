@@ -14,6 +14,7 @@ import { FormEditorSidebar } from './components/FormEditorSidebar';
 import { SavedReportsModal } from './components/SavedReportsModal';
 import { UploadReportModal } from './components/UploadReportModal';
 import { DuplicateWarningModal, DuplicateAlertInfo } from './components/DuplicateWarningModal';
+import { BranchOfficerModal, OfficerSession, getStoredOfficerSession } from './components/BranchOfficerModal';
 import { saveReport, fetchAllReports, testConnection, DuplicateReportError, subscribeToSavedReports, getLocalCache } from './services/firebase';
 import { exportToExcel, exportToWord, exportToJson } from './utils/exportUtils';
 import { CheckCircle, AlertCircle, Info, ChevronRight } from 'lucide-react';
@@ -35,6 +36,9 @@ export default function App() {
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
   const [duplicateAlert, setDuplicateAlert] = useState<DuplicateAlertInfo | null>(null);
   const [savedReportsCount, setSavedReportsCount] = useState<number>(0);
+  const [officerSession, setOfficerSession] = useState<OfficerSession | null>(getStoredOfficerSession);
+  const [isOfficerModalOpen, setIsOfficerModalOpen] = useState<boolean>(false);
+  const [officerModalMode, setOfficerModalMode] = useState<'startup' | 'new_sheet' | 'switch'>('startup');
   // Load saved state or default to sampleKulwantSingh
   const [reportData, setReportData] = useState<PDReportData>(() => {
     try {
@@ -149,6 +153,15 @@ export default function App() {
     };
   }, []);
 
+  // Check on boot if officer session exists; if not, open startup prompt
+  useEffect(() => {
+    const existing = getStoredOfficerSession();
+    if (!existing) {
+      setOfficerModalMode('startup');
+      setIsOfficerModalOpen(true);
+    }
+  }, []);
+
   // Browser warn on reload/leave if report has unsaved changes
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -225,10 +238,16 @@ export default function App() {
     if (isSaving) return;
     setIsSaving(true);
     try {
-      const savedRecord = await saveReport(reportData, currentReportId || undefined);
+      const savedRecord = await saveReport(
+        reportData,
+        currentReportId || undefined,
+        officerSession || undefined
+      );
       setCurrentReportId(savedRecord.id);
       setIsReportModified(false);
-      showToast(`✓ Report saved to database! (ID: ${savedRecord.id})`);
+      showToast(
+        `✓ Report saved to database! (Tagged: ${savedRecord.officerName || 'Officer'}, ID: ${savedRecord.id})`
+      );
     } catch (err: any) {
       console.error('Error saving report to database:', err);
       if (err instanceof DuplicateReportError || err?.name === 'DuplicateReportError') {
@@ -250,17 +269,27 @@ export default function App() {
   };
 
   const handleLoadReportFromUpload = async (data: PDReportData, autoSaveToDb: boolean = false) => {
+    // Auto-tag with active officer & branch if available
+    const taggedData: PDReportData = {
+      ...data,
+      branchName: data.branchName || officerSession?.branchName || '',
+      officerName: data.officerName || officerSession?.officerName || '',
+      branch_name: data.branch_name || officerSession?.branchName || '',
+      officer_name: data.officer_name || officerSession?.officerName || '',
+      pdAuthorisedPerson: data.pdAuthorisedPerson || officerSession?.officerName || ''
+    };
+
     // 1. Populate all form inputs across the report editor
-    setReportData(data);
+    setReportData(taggedData);
     setIsReportModified(true);
 
     if (autoSaveToDb) {
       setIsSaving(true);
       try {
-        const savedRecord = await saveReport(data);
+        const savedRecord = await saveReport(taggedData, undefined, officerSession || undefined);
         setCurrentReportId(savedRecord.id);
         setIsReportModified(false);
-        showToast(`✓ Report for "${data.customerName || 'Applicant'}" uploaded and saved! (ID: ${savedRecord.id})`);
+        showToast(`✓ Report for "${taggedData.customerName || 'Applicant'}" uploaded and saved! (ID: ${savedRecord.id})`);
       } catch (err: any) {
         console.error('Error saving uploaded report:', err);
         if (err instanceof DuplicateReportError || err?.name === 'DuplicateReportError') {
@@ -283,7 +312,7 @@ export default function App() {
       // User opted to review and edit fields before saving
       setCurrentReportId(null);
       setIsReportModified(true);
-      showToast(`✓ Report for "${data.customerName || 'Applicant'}" loaded. Review, edit fields, then click "Save Report".`);
+      showToast(`✓ Report for "${taggedData.customerName || 'Applicant'}" loaded. Review, edit fields, then click "Save Report".`);
     }
 
     // Scroll to top of preview sheet so user can review immediately
@@ -304,14 +333,7 @@ export default function App() {
     showToast(`✓ Loaded Report: ${record.customerName || 'Applicant'} (${record.id})`);
   };
 
-  const handleNewReport = () => {
-    if (isReportModified) {
-      const confirmDiscard = window.confirm(
-        'You have unsaved changes. Start a new sheet?'
-      );
-      if (!confirmDiscard) return;
-    }
-
+  const executeStartNewSheet = (session: OfficerSession) => {
     setReportData({
       ...blankReport,
       shopNo: '',
@@ -322,7 +344,11 @@ export default function App() {
       permanentAddress: '',
       contactNumbers: '',
       distNearestBranch: '',
-      distSourcingBranch: '',
+      distSourcingBranch: session.branchName || '',
+      branchName: session.branchName || '',
+      officerName: session.officerName || '',
+      branch_name: session.branchName || '',
+      officer_name: session.officerName || '',
       businessNameAddress: '',
       businessVintage: '',
       monthlyIncomeDetails: '',
@@ -365,13 +391,57 @@ export default function App() {
       deviationFindings: '',
       remarksNotes: '',
       mitigateNotes: '',
-      pdAuthorisedPerson: '',
+      pdAuthorisedPerson: session.officerName || '',
       signatureDataUrl: '',
       signDate: new Date().toLocaleDateString('en-GB')
     });
     setCurrentReportId(null);
     setIsReportModified(false);
-    showToast('✓ Started fresh blank PD sheet');
+    showToast(`✓ Started fresh blank PD sheet for ${session.officerName} (${session.branchName})`);
+  };
+
+  const handleNewReport = () => {
+    if (isReportModified) {
+      const confirmDiscard = window.confirm(
+        'You have unsaved changes. Start a new sheet?'
+      );
+      if (!confirmDiscard) return;
+    }
+
+    // Display lightweight Branch & Officer entry modal on New Sheet
+    setOfficerModalMode('new_sheet');
+    setIsOfficerModalOpen(true);
+  };
+
+  const handleConfirmOfficerSession = (session: OfficerSession) => {
+    setOfficerSession(session);
+    setIsOfficerModalOpen(false);
+
+    if (officerModalMode === 'new_sheet') {
+      executeStartNewSheet(session);
+    } else if (officerModalMode === 'startup') {
+      // Auto-tag current report if it lacks branch/officer
+      setReportData((prev) => ({
+        ...prev,
+        branchName: prev.branchName || session.branchName,
+        officerName: prev.officerName || session.officerName,
+        branch_name: prev.branch_name || session.branchName,
+        officer_name: prev.officer_name || session.officerName,
+        pdAuthorisedPerson: prev.pdAuthorisedPerson || session.officerName
+      }));
+      showToast(`Welcome ${session.officerName} · Branch: ${session.branchName}`);
+    } else {
+      // mode === 'switch'
+      setReportData((prev) => ({
+        ...prev,
+        branchName: session.branchName,
+        officerName: session.officerName,
+        branch_name: session.branchName,
+        officer_name: session.officerName,
+        pdAuthorisedPerson: prev.pdAuthorisedPerson || session.officerName
+      }));
+      showToast(`Switched active officer to ${session.officerName} (${session.branchName})`);
+    }
   };
 
   const handleLoadSample = (sampleType: 'kulwant' | 'rajesh' | 'blank') => {
@@ -489,12 +559,17 @@ export default function App() {
         isReportModified={isReportModified}
         currentReportId={currentReportId}
         savedReportsCount={savedReportsCount}
+        activeOfficerSession={officerSession}
+        onOpenOfficerModal={() => {
+          setOfficerModalMode('switch');
+          setIsOfficerModalOpen(true);
+        }}
       />
 
       {/* Floating Scannable Summary Ribbon (Screen Only) */}
       <div className="no-print bg-slate-800/95 border-b border-slate-700/80 px-4 py-1.5 text-xs text-slate-300">
         <div className="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-4 text-[11px]">
+          <div className="flex items-center gap-3 sm:gap-4 text-[11px] flex-wrap">
             <span className="font-semibold text-slate-100 flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
               {reportData.customerName || 'Borrower'} · {reportData.shopNo ? `Shop ${reportData.shopNo}` : 'Unassigned'}
@@ -509,6 +584,22 @@ export default function App() {
                 {isReportModified ? 'Draft • Unsaved' : 'Draft'}
               </span>
             )}
+            <span className="text-slate-500">|</span>
+            {/* Active Branch & Officer Pill (Clickable) */}
+            <button
+              type="button"
+              onClick={() => {
+                setOfficerModalMode('switch');
+                setIsOfficerModalOpen(true);
+              }}
+              className="text-[10px] bg-slate-700/80 hover:bg-slate-700 text-slate-200 px-2 py-0.5 rounded border border-slate-600 hover:border-indigo-400/50 flex items-center gap-1.5 transition cursor-pointer"
+              title="Click to switch Branch or Officer"
+            >
+              <span className="text-blue-400 font-semibold">📍 {officerSession?.branchName || 'Beawar'}</span>
+              <span className="text-slate-500">|</span>
+              <span className="text-indigo-300 font-semibold">👤 {officerSession?.officerName || 'Credit Officer'}</span>
+              <span className="text-[9px] text-slate-400 underline ml-0.5">Switch</span>
+            </button>
             <span className="text-slate-500">|</span>
             <span>Family Members: <strong className="text-slate-200">{totalFamilyCount || '0'}</strong></span>
             {reportData.cibilAppScore && reportData.cibilAppScore.trim() !== '' && (
@@ -702,6 +793,7 @@ export default function App() {
         onOpenUploadModal={() => setIsUploadModalOpen(true)}
         onReportsCountChange={(count) => setSavedReportsCount(count)}
         currentReportId={currentReportId}
+        activeOfficerSession={officerSession}
       />
 
       {/* Upload PDF / Report & Edit Modal */}
@@ -720,6 +812,15 @@ export default function App() {
           setDuplicateAlert(null);
           setIsSavedReportsModalOpen(true);
         }}
+      />
+
+      {/* Lightweight Branch & Officer Entry Modal (Startup, New Sheet, or Switch) */}
+      <BranchOfficerModal
+        isOpen={isOfficerModalOpen}
+        onClose={() => setIsOfficerModalOpen(false)}
+        onConfirm={handleConfirmOfficerSession}
+        initialSession={officerSession}
+        mode={officerModalMode}
       />
     </div>
   );
