@@ -14,6 +14,7 @@ import { FormEditorSidebar } from './components/FormEditorSidebar';
 import { SavedReportsModal } from './components/SavedReportsModal';
 import { UploadReportModal } from './components/UploadReportModal';
 import { DuplicateWarningModal, DuplicateAlertInfo } from './components/DuplicateWarningModal';
+import { GoogleSheetsSettingsModal } from './components/GoogleSheetsSettingsModal';
 import {
   BranchOfficerModal,
   OfficerSession,
@@ -30,8 +31,13 @@ import {
   isSkopMatch,
   generateUniqueSkop
 } from './services/firebase';
+import {
+  getGoogleSheetsWebhookUrl,
+  getGoogleSheetsAutoSync,
+  syncReportToGoogleSheets
+} from './services/googleSheets';
 import { exportToExcel, exportToWord, exportToJson } from './utils/exportUtils';
-import { CheckCircle, AlertCircle, Info, ChevronRight } from 'lucide-react';
+import { CheckCircle, AlertCircle, Info, ChevronRight, FileSpreadsheet } from 'lucide-react';
 
 const STORAGE_KEY = 'sk_finance_pd_report_state_v2';
 const ACTIVE_REPORT_ID_KEY = 'sk_finance_active_report_id';
@@ -48,6 +54,8 @@ export default function App() {
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [isSavedReportsModalOpen, setIsSavedReportsModalOpen] = useState<boolean>(false);
   const [isUploadModalOpen, setIsUploadModalOpen] = useState<boolean>(false);
+  const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState<boolean>(false);
+  const [isSyncingToSheets, setIsSyncingToSheets] = useState<boolean>(false);
   const [duplicateAlert, setDuplicateAlert] = useState<DuplicateAlertInfo | null>(null);
   const [savedReportsCount, setSavedReportsCount] = useState<number>(0);
   const [officerSession, setOfficerSession] = useState<OfficerSession | null>(getStoredOfficerSession);
@@ -272,9 +280,32 @@ export default function App() {
       setCurrentReportId(savedRecord.id);
       setIsReportModified(false);
       setDuplicateAlert(null);
-      showToast(
-        `✓ Report saved to database! (Tagged: ${savedRecord.officerName || 'Officer'}, ID: ${savedRecord.id})`
-      );
+
+      // Check if auto-sync to Google Sheets is enabled and webhook URL configured
+      const autoSyncEnabled = getGoogleSheetsAutoSync();
+      const webhookUrl = getGoogleSheetsWebhookUrl();
+      if (autoSyncEnabled && webhookUrl) {
+        try {
+          await syncReportToGoogleSheets(
+            savedRecord.reportData,
+            webhookUrl,
+            officerSession,
+            savedRecord.id
+          );
+          showToast(
+            `✓ Report saved to database & synced to Google Sheet! (${savedRecord.officerName || 'Officer'}, ID: ${savedRecord.id})`
+          );
+        } catch (syncErr: any) {
+          console.warn('Auto-sync to Google Sheet failed:', syncErr);
+          showToast(
+            `✓ Saved to database (Google Sheet sync failed: ${syncErr?.message || 'Check URL'})`
+          );
+        }
+      } else {
+        showToast(
+          `✓ Report saved to database! (Tagged: ${savedRecord.officerName || 'Officer'}, ID: ${savedRecord.id})`
+        );
+      }
     } catch (err: any) {
       if (err instanceof DuplicateReportError || err?.name === 'DuplicateReportError') {
         console.warn('Duplicate report check triggered:', err.message);
@@ -297,6 +328,32 @@ export default function App() {
     }
   };
 
+  const handleSyncToGoogleSheets = async () => {
+    if (isSyncingToSheets) return;
+    const url = getGoogleSheetsWebhookUrl();
+    if (!url) {
+      setIsGoogleSheetsModalOpen(true);
+      showToast('Please paste your Google Apps Script Web App URL first');
+      return;
+    }
+
+    setIsSyncingToSheets(true);
+    try {
+      const res = await syncReportToGoogleSheets(
+        reportData,
+        url,
+        officerSession,
+        currentReportId
+      );
+      showToast(`✓ ${res.message}`);
+    } catch (err: any) {
+      console.error('Google Sheets sync error:', err);
+      showToast(`Google Sheets Sync Error: ${err?.message || 'Network error'}`);
+    } finally {
+      setIsSyncingToSheets(false);
+    }
+  };
+
   const handleAutoFixSkop = async () => {
     const newSkop = generateUniqueSkop(reportData.shopNo);
     const updatedData = { ...reportData, shopNo: newSkop };
@@ -316,7 +373,7 @@ export default function App() {
       setDuplicateAlert(null);
       showToast(`✓ Loaded cloud report (ID: ${existing.id}) for ${existing.customerName}`);
     } else {
-      const all = await fetchAllReports(officerSession, true);
+      const all = await fetchAllReports(officerSession);
       const found = all.find((r) => r.id === reportId);
       if (found && found.reportData) {
         setReportData(found.reportData);
@@ -609,6 +666,9 @@ export default function App() {
           setIsOfficerModalOpen(true);
         }}
         onLogout={handleLogout}
+        onOpenGoogleSheetsModal={() => setIsGoogleSheetsModalOpen(true)}
+        onSyncToGoogleSheets={handleSyncToGoogleSheets}
+        isSyncingToGoogleSheets={isSyncingToSheets}
       />
 
       {/* Floating Scannable Summary Ribbon (Screen Only) */}
@@ -657,7 +717,23 @@ export default function App() {
             <span>Legal: <strong className="text-slate-200">{reportData.legalStatus}</strong></span>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Google Sheets Sync Pill / Button */}
+            <button
+              type="button"
+              onClick={() => setIsGoogleSheetsModalOpen(true)}
+              className="text-[10px] bg-slate-700/80 hover:bg-slate-700 text-slate-200 px-2 py-0.5 rounded border border-slate-600 hover:border-emerald-400/50 flex items-center gap-1.5 transition cursor-pointer"
+              title="Click to configure Google Apps Script Webhook or view sync status"
+            >
+              <FileSpreadsheet className="w-3 h-3 text-emerald-400" />
+              <span>
+                Sheet Sync:{' '}
+                <strong className={getGoogleSheetsWebhookUrl() ? 'text-emerald-300' : 'text-slate-400'}>
+                  {getGoogleSheetsWebhookUrl() ? (getGoogleSheetsAutoSync() ? 'Auto' : 'Configured') : 'Setup'}
+                </strong>
+              </span>
+            </button>
+
             <span
               className={`px-2 py-0.5 rounded text-[11px] font-bold inline-flex items-center gap-1 ${
                 reportData.recommendation === 'Recommended'
@@ -686,7 +762,9 @@ export default function App() {
             onNewReport={handleNewReport}
             onSaveReport={() => handleSaveReport()}
             onOpenUploadModal={() => setIsUploadModalOpen(true)}
+            onSyncToGoogleSheets={handleSyncToGoogleSheets}
             isSavingReport={isSaving}
+            isSyncingToSheets={isSyncingToSheets}
             isReportModified={isReportModified}
             currentReportId={currentReportId}
           />
@@ -870,6 +948,17 @@ export default function App() {
         onLogout={handleLogout}
         initialSession={officerSession}
         mode={officerModalMode}
+      />
+
+      {/* Google Sheets Sync Settings & Manual Sync Modal */}
+      <GoogleSheetsSettingsModal
+        isOpen={isGoogleSheetsModalOpen}
+        onClose={() => setIsGoogleSheetsModalOpen(false)}
+        reportData={reportData}
+        activeOfficerSession={officerSession}
+        currentReportId={currentReportId}
+        onSyncSuccess={(msg) => showToast(`✓ ${msg}`)}
+        onSyncError={(err) => showToast(`Sync Error: ${err}`)}
       />
     </div>
   );

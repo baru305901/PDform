@@ -3,7 +3,8 @@ import { SavedReportRecord, PDReportData } from '../types';
 import {
   fetchAllReports,
   deleteReport,
-  duplicateReport
+  duplicateReport,
+  generatePartitionKey
 } from '../services/firebase';
 import {
   Search,
@@ -88,18 +89,14 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
   const [deleteCandidate, setDeleteCandidate] = useState<SavedReportRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // Partition Scope: Defaults to 'my_reports' to ensure complete data isolation across officers
-  const [viewScope, setViewScope] = useState<'my_reports' | 'all_reports'>('my_reports');
-
   // Action status message
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
-  const loadReports = async (scope: 'my_reports' | 'all_reports' = viewScope) => {
+  const loadReports = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const isAll = scope === 'all_reports';
-      const data = await fetchAllReports(activeOfficerSession, isAll);
+      const data = await fetchAllReports(activeOfficerSession);
       setReports(data);
     } catch (err: any) {
       setError(err?.message || 'Failed to load saved reports');
@@ -110,8 +107,7 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      setViewScope('my_reports');
-      loadReports('my_reports');
+      loadReports();
     }
   }, [isOpen, activeOfficerSession]);
 
@@ -189,8 +185,8 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
         ''
       ).trim();
 
-      // Zero Data Mixing: In 'my_reports' mode, strictly enforce active officer & branch partition
-      if (viewScope === 'my_reports' && activeOfficerSession?.officerName) {
+      // Zero Data Mixing: Strictly enforce active officer & branch partition
+      if (activeOfficerSession?.officerName) {
         const myOfficer = activeOfficerSession.officerName.replace(/Kuamar/gi, 'Kumar').trim().toLowerCase();
         const myBranch = (activeOfficerSession.branchName || '').trim().toLowerCase();
         const officerMatches = reportOfficer.toLowerCase() === myOfficer;
@@ -253,7 +249,6 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
     });
   }, [
     reports,
-    viewScope,
     activeOfficerSession,
     searchTerm,
     filterApplicant,
@@ -404,56 +399,35 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
 
         {/* Search & Filter Toolbar */}
         <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-900/90 space-y-3">
-          {/* Partition Scope Segmented Selector (Zero Data Mixing) */}
-          <div className="flex flex-wrap items-center justify-between gap-2.5 bg-slate-950/70 p-2 rounded-xl border border-slate-800">
-            <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-lg border border-slate-800">
-              <button
-                type="button"
-                onClick={() => {
-                  setViewScope('my_reports');
-                  setCurrentPage(1);
-                  loadReports('my_reports');
-                }}
-                className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all ${
-                  viewScope === 'my_reports'
-                    ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/50'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                }`}
-                title="Default: View only reports in your active officer partition"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-blue-200" />
-                <span>My Reports ({activeOfficerSession?.officerName || 'Active Officer'})</span>
-                <span className="text-[10px] bg-blue-500/20 text-blue-200 border border-blue-400/30 px-1.5 py-0.5 rounded-full font-semibold">
-                  Isolated
-                </span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setViewScope('all_reports');
-                  setCurrentPage(1);
-                  loadReports('all_reports');
-                }}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition-all ${
-                  viewScope === 'all_reports'
-                    ? 'bg-slate-700 text-white shadow-sm ring-1 ring-slate-500/50'
-                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-                }`}
-                title="View all archived reports across branch partitions"
-              >
-                <Layers className="w-3.5 h-3.5 text-slate-400" />
-                <span>All Branch Reports</span>
-              </button>
+          {/* Officer-Exclusive Partition Header (Strict Data Isolation) */}
+          <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/80 p-3 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-2.5">
+              <div className="w-9 h-9 rounded-xl bg-blue-500/20 border border-blue-500/40 flex items-center justify-center text-blue-400 shrink-0 shadow-inner">
+                <ShieldCheck className="w-5 h-5 text-blue-400" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-white">
+                    {activeOfficerSession?.officerName || 'Credit Officer'}'s Reports
+                  </span>
+                  <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+                    <Lock className="w-3 h-3 text-emerald-400" />
+                    <span>Strict Partition Isolation</span>
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400">
+                  Branch: <strong className="text-slate-300">{activeOfficerSession?.branchName || 'Beawar'}</strong> · Private officer workspace, zero data mixing
+                </div>
+              </div>
             </div>
 
-            {/* Active Partition Security Status */}
+            {/* Active Partition Cloud Status */}
             <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1.5 rounded-lg shadow-xs">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span className="text-slate-400">Partition:</span>
-                <strong className="text-white font-semibold">
-                  {activeOfficerSession?.branchName || 'Beawar'} · {activeOfficerSession?.officerName || 'Credit Officer'}
+                <span className="text-slate-400">Firestore Partition:</span>
+                <strong className="text-emerald-200 font-mono text-[11px]">
+                  {generatePartitionKey(activeOfficerSession?.branchName, activeOfficerSession?.officerName)}
                 </strong>
                 <span className="text-slate-600">|</span>
                 <span className="text-emerald-300 font-medium">Cloud Synced</span>

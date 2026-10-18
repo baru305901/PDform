@@ -20,7 +20,8 @@ import {
   FilePlus2,
   Building2,
   User,
-  LogOut
+  LogOut,
+  Settings2
 } from 'lucide-react';
 import { PDReportData } from '../types';
 
@@ -50,6 +51,9 @@ interface HeaderBarProps {
   activeOfficerSession?: { branchName: string; officerName: string } | null;
   onOpenOfficerModal?: () => void;
   onLogout?: () => void;
+  onOpenGoogleSheetsModal?: () => void;
+  onSyncToGoogleSheets?: () => void;
+  isSyncingToGoogleSheets?: boolean;
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
@@ -77,7 +81,10 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   onOpenUploadModal,
   activeOfficerSession,
   onOpenOfficerModal,
-  onLogout
+  onLogout,
+  onOpenGoogleSheetsModal,
+  onSyncToGoogleSheets,
+  isSyncingToGoogleSheets = false
 }) => {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
@@ -318,6 +325,36 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
                 <span className="w-2 h-2 rounded-full bg-amber-300 animate-pulse" title="Unsaved changes"></span>
               )}
             </button>
+          )}
+
+          {/* Sync to Google Sheets Button Group */}
+          {onSyncToGoogleSheets && (
+            <div className="inline-flex items-center rounded-md shadow-xs ring-1 ring-emerald-500/30">
+              <button
+                onClick={onSyncToGoogleSheets}
+                disabled={isSyncingToGoogleSheets}
+                type="button"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-l-md bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition active:scale-95 disabled:opacity-50 cursor-pointer"
+                title="Sync complete report data directly to your Google Sheet via Apps Script Webhook"
+              >
+                {isSyncingToGoogleSheets ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin text-emerald-200" />
+                ) : (
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-200" />
+                )}
+                <span>{isSyncingToGoogleSheets ? 'Syncing...' : 'Sync to Sheet'}</span>
+              </button>
+              {onOpenGoogleSheetsModal && (
+                <button
+                  type="button"
+                  onClick={onOpenGoogleSheetsModal}
+                  className="px-1.5 py-1.5 rounded-r-md bg-emerald-800 hover:bg-emerald-700 text-emerald-200 hover:text-white border-l border-emerald-600/50 text-xs transition cursor-pointer"
+                  title="Configure Google Apps Script Webhook URL & Auto-Sync"
+                >
+                  <Settings2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           )}
 
           {/* Preset Samples */}

@@ -15,7 +15,8 @@ import {
   FilePlus2,
   Upload,
   Save,
-  Loader2
+  Loader2,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface FormEditorSidebarProps {
@@ -24,7 +25,9 @@ interface FormEditorSidebarProps {
   onNewReport?: () => void;
   onSaveReport?: () => void;
   onOpenUploadModal?: () => void;
+  onSyncToGoogleSheets?: () => void;
   isSavingReport?: boolean;
+  isSyncingToSheets?: boolean;
   isReportModified?: boolean;
   currentReportId?: string | null;
 }
@@ -35,7 +38,9 @@ export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({
   onNewReport,
   onSaveReport,
   onOpenUploadModal,
+  onSyncToGoogleSheets,
   isSavingReport = false,
+  isSyncingToSheets = false,
   isReportModified = false,
   currentReportId = null
 }) => {
@@ -87,6 +92,23 @@ export const FormEditorSidebar: React.FC<FormEditorSidebarProps> = ({
               {isReportModified && (
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-300 animate-pulse" title="Unsaved changes"></span>
               )}
+            </button>
+          )}
+
+          {onSyncToGoogleSheets && (
+            <button
+              type="button"
+              onClick={onSyncToGoogleSheets}
+              disabled={isSyncingToSheets}
+              className="px-2 py-1.5 rounded-md bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold shadow-xs transition active:scale-95 disabled:opacity-50 inline-flex items-center justify-center gap-1"
+              title="Sync to Google Sheet"
+            >
+              {isSyncingToSheets ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-200" />
+              )}
+              <span>Sheet</span>
             </button>
           )}
         </div>
