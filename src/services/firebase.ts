@@ -454,7 +454,7 @@ export async function validateReportUniqueness(
 ): Promise<{ isValid: boolean; error?: DuplicateReportError; conflictingRecord?: SavedReportRecord }> {
   // Validate against both active partition and global records
   const allRecords = await fetchAllReports(officerContext, true);
-  const currentId = existingId?.trim() || '';
+  const currentId = typeof existingId === 'string' && existingId.trim() ? existingId.trim() : '';
 
   // 1. Strict Validation: SKOP Number uniqueness
   const skop = (reportData.shopNo || '').trim();
@@ -540,7 +540,7 @@ export async function saveReport(
   officerContext?: { branchName?: string; officerName?: string },
   allowAutoLink: boolean = true
 ): Promise<SavedReportRecord> {
-  let resolvedId = existingId && existingId.trim() ? existingId.trim() : '';
+  let resolvedId = typeof existingId === 'string' && existingId.trim() ? existingId.trim() : '';
 
   // If no explicit ID was provided, auto-link to existing report IF the SKOP and customer name match
   if (!resolvedId && allowAutoLink) {

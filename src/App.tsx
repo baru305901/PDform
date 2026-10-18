@@ -243,11 +243,17 @@ export default function App() {
     }));
   };
 
-  const handleSaveReport = async (overrideReportId?: string, overrideReportData?: PDReportData) => {
+  const handleSaveReport = async (overrideReportId?: string | any, overrideReportData?: PDReportData) => {
     if (isSaving) return;
     setIsSaving(true);
-    const dataToSave = overrideReportData || reportData;
-    const targetId = overrideReportId !== undefined ? overrideReportId : (currentReportId || undefined);
+    // Guard against React SyntheticEvent objects when invoked directly from onClick
+    const validOverrideId =
+      typeof overrideReportId === 'string' && overrideReportId.trim() ? overrideReportId.trim() : undefined;
+    const dataToSave =
+      overrideReportData && typeof overrideReportData === 'object' && !('nativeEvent' in (overrideReportData as any))
+        ? overrideReportData
+        : reportData;
+    const targetId = validOverrideId !== undefined ? validOverrideId : (currentReportId || undefined);
 
     try {
       const savedRecord = await saveReport(
@@ -607,7 +613,7 @@ export default function App() {
         setViewMode={setViewMode}
         reportData={reportData}
         onNewReport={handleNewReport}
-        onSaveReport={handleSaveReport}
+        onSaveReport={() => handleSaveReport()}
         onOpenSavedReports={() => setIsSavedReportsModalOpen(true)}
         onOpenUploadModal={() => setIsUploadModalOpen(true)}
         isSavingReport={isSaving}
@@ -694,7 +700,7 @@ export default function App() {
             data={reportData}
             onChange={handleFieldChange}
             onNewReport={handleNewReport}
-            onSaveReport={handleSaveReport}
+            onSaveReport={() => handleSaveReport()}
             onOpenUploadModal={() => setIsUploadModalOpen(true)}
             isSavingReport={isSaving}
             isReportModified={isReportModified}
