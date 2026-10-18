@@ -31,10 +31,15 @@ export function getStoredOfficerSession(): OfficerSession | null {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && typeof parsed === 'object') {
-        return {
-          branchName: parsed.branchName || parsed.branch_name || '',
-          officerName: parsed.officerName || parsed.officer_name || ''
-        };
+        const rawOfficer = parsed.officerName || parsed.officer_name || '';
+        const officerName = rawOfficer.replace(/Kuamar/gi, 'Kumar').trim();
+        const branchName = (parsed.branchName || parsed.branch_name || '').trim();
+        const session = { branchName, officerName };
+        // If it was misspelled Kuamar in localStorage, immediately update it to Kumar
+        if (rawOfficer.includes('Kuamar')) {
+          saveStoredOfficerSession(session);
+        }
+        return session;
       }
     }
   } catch (e) {
@@ -45,7 +50,11 @@ export function getStoredOfficerSession(): OfficerSession | null {
 
 export function saveStoredOfficerSession(session: OfficerSession): void {
   try {
-    localStorage.setItem(OFFICER_SESSION_STORAGE_KEY, JSON.stringify(session));
+    const sanitized: OfficerSession = {
+      branchName: session.branchName.trim(),
+      officerName: session.officerName.replace(/Kuamar/gi, 'Kumar').trim()
+    };
+    localStorage.setItem(OFFICER_SESSION_STORAGE_KEY, JSON.stringify(sanitized));
   } catch (e) {
     console.warn('Error saving officer session:', e);
   }
@@ -75,7 +84,7 @@ export const BranchOfficerModal: React.FC<BranchOfficerModalProps> = ({
       const existing = initialSession || getStoredOfficerSession();
       if (existing) {
         setBranchName(existing.branchName || '');
-        setOfficerName(existing.officerName || '');
+        setOfficerName((existing.officerName || '').replace(/Kuamar/gi, 'Kumar'));
       } else {
         setBranchName('Beawar');
         setOfficerName('Manish Kumar');

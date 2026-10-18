@@ -19,6 +19,7 @@ export interface SavedReportRecord {
   officerName?: string;
   branch_name?: string;
   officer_name?: string;
+  partitionKey?: string;
   createdAt: string;
   updatedAt: string;
   reportData: PDReportData;
@@ -33,6 +34,7 @@ export interface PDReportData {
   officerName?: string;
   branch_name?: string;
   officer_name?: string;
+  partitionKey?: string;
 
   // Borrower & Residence Details
   customerName: string;

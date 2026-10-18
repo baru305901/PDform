@@ -11,21 +11,83 @@ import {
   query,
   orderBy,
   getDocFromServer,
-  onSnapshot
+  onSnapshot,
+  Unsubscribe
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { PDReportData, SavedReportRecord } from '../types';
+import { getStoredOfficerSession } from '../components/BranchOfficerModal';
 
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 
-const LOCAL_BACKUP_KEY = 'sk_finance_saved_reports_cache_v1';
+const GLOBAL_CACHE_KEY = 'sk_finance_saved_reports_cache_v1';
 
-// Safe local cache functions for offline fallback
-export function getLocalCache(): SavedReportRecord[] {
+/**
+ * Generate a deterministic, sanitized partition key from branch & officer name.
+ * Prevents cross-contamination between different credit officers and branches.
+ */
+export function generatePartitionKey(branchName?: string, officerName?: string): string {
+  const cleanBranch = (branchName || 'default_branch')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'default_branch';
+
+  const cleanOfficer = (officerName || 'default_officer')
+    .replace(/Kuamar/gi, 'Kumar')
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'default_officer';
+
+  return `${cleanBranch}__${cleanOfficer}`;
+}
+
+export function getPartitionCacheKey(partitionKey: string): string {
+  return `sk_finance_cache_partition_${partitionKey}`;
+}
+
+export function getPartitionLocalCache(partitionKey: string): SavedReportRecord[] {
   try {
-    const raw = localStorage.getItem(LOCAL_BACKUP_KEY);
+    const raw = localStorage.getItem(getPartitionCacheKey(partitionKey));
+    if (raw) {
+      return JSON.parse(raw);
+    }
+  } catch (e) {
+    console.error('Error reading partition cache:', e);
+  }
+  return [];
+}
+
+export function setPartitionLocalCache(partitionKey: string, records: SavedReportRecord[]): void {
+  try {
+    localStorage.setItem(getPartitionCacheKey(partitionKey), JSON.stringify(records));
+  } catch (e) {
+    console.error('Error writing partition cache:', e);
+  }
+}
+
+// Local cache functions with partition awareness
+export function getLocalCache(partitionKey?: string): SavedReportRecord[] {
+  try {
+    // If specific partition key provided, prioritize it
+    if (partitionKey) {
+      const partCache = getPartitionLocalCache(partitionKey);
+      if (partCache.length > 0) return partCache;
+    }
+
+    // Try current active officer partition from session
+    const currentSession = getStoredOfficerSession();
+    if (currentSession?.branchName && currentSession?.officerName) {
+      const activeKey = generatePartitionKey(currentSession.branchName, currentSession.officerName);
+      const activePart = getPartitionLocalCache(activeKey);
+      if (activePart.length > 0) return activePart;
+    }
+
+    // Fallback to global cache
+    const raw = localStorage.getItem(GLOBAL_CACHE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch (e) {
     console.error('Error reading local reports cache:', e);
@@ -33,55 +95,46 @@ export function getLocalCache(): SavedReportRecord[] {
   }
 }
 
-export function setLocalCache(records: SavedReportRecord[]): void {
+export function setLocalCache(records: SavedReportRecord[], partitionKey?: string): void {
   try {
-    localStorage.setItem(LOCAL_BACKUP_KEY, JSON.stringify(records));
+    // Determine active partition key
+    let targetKey = partitionKey;
+    if (!targetKey) {
+      const currentSession = getStoredOfficerSession();
+      if (currentSession?.branchName && currentSession?.officerName) {
+        targetKey = generatePartitionKey(currentSession.branchName, currentSession.officerName);
+      }
+    }
+
+    if (targetKey) {
+      setPartitionLocalCache(targetKey, records);
+    }
+
+    // Also update global cache with latest records (merge by ID)
+    const rawGlobal = localStorage.getItem(GLOBAL_CACHE_KEY);
+    const globalList: SavedReportRecord[] = rawGlobal ? JSON.parse(rawGlobal) : [];
+    const map = new Map<string, SavedReportRecord>();
+    globalList.forEach((r) => map.set(r.id, r));
+    records.forEach((r) => map.set(r.id, r));
+    const merged = Array.from(map.values()).sort(
+      (a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime()
+    );
+
+    localStorage.setItem(GLOBAL_CACHE_KEY, JSON.stringify(merged));
+
     if (typeof window !== 'undefined') {
       window.dispatchEvent(
         new CustomEvent('sk_reports_changed', {
-          detail: { count: records.length, records }
+          detail: {
+            count: records.length,
+            records,
+            partitionKey: targetKey
+          }
         })
       );
     }
   } catch (e) {
     console.error('Error updating local reports cache:', e);
-  }
-}
-
-// Subscribe to real-time updates from Firestore collection and local cache
-export function subscribeToSavedReports(
-  onUpdate: (reports: SavedReportRecord[]) => void
-): () => void {
-  // Immediately emit current local cache so count displays without any network delay
-  const initialCache = getLocalCache();
-  onUpdate(initialCache);
-
-  try {
-    const colRef = collection(db, 'saved_reports');
-    const q = query(colRef, orderBy('updatedAt', 'desc'));
-    const unsubscribe = onSnapshot(
-      q,
-      (snapshot) => {
-        const reports: SavedReportRecord[] = [];
-        snapshot.forEach((d) => {
-          const data = d.data() as SavedReportRecord;
-          reports.push({
-            ...data,
-            id: d.id,
-          });
-        });
-        setLocalCache(reports);
-        onUpdate(reports);
-      },
-      (error) => {
-        console.warn('Firestore real-time subscription error, using local cache:', error);
-        onUpdate(getLocalCache());
-      }
-    );
-    return unsubscribe;
-  } catch (err) {
-    console.error('Failed to setup Firestore subscription:', err);
-    return () => {};
   }
 }
 
@@ -95,12 +148,72 @@ export async function testConnection(): Promise<boolean> {
       console.warn('Firestore is running in offline mode.');
       return false;
     }
-    // Any other error (like document not found) still proves server connectivity
     return true;
   }
 }
 
-export async function fetchAllReports(): Promise<SavedReportRecord[]> {
+/**
+ * Fetch reports for a specific officer partition or all reports
+ */
+export async function fetchReportsByPartition(
+  officerContext?: { branchName?: string; officerName?: string } | null,
+  includeAll = false
+): Promise<SavedReportRecord[]> {
+  const session = officerContext || getStoredOfficerSession();
+  const partitionKey = session?.branchName && session?.officerName
+    ? generatePartitionKey(session.branchName, session.officerName)
+    : null;
+
+  // 1. If scoped to an active officer partition (Default for zero data mixing)
+  if (!includeAll && partitionKey) {
+    try {
+      // Query physical partitioned subcollection
+      const partCol = collection(db, 'officer_partitions', partitionKey, 'reports');
+      const qPart = query(partCol, orderBy('updatedAt', 'desc'));
+      const snapshot = await getDocs(qPart);
+
+      const partReports: SavedReportRecord[] = [];
+      snapshot.forEach((d) => {
+        const item = d.data() as SavedReportRecord;
+        partReports.push({ ...item, id: d.id });
+      });
+
+      // Also check root collection to catch any reports saved under this officer before subcollections or offline
+      try {
+        const rootCol = collection(db, 'saved_reports');
+        const qRoot = query(rootCol, orderBy('updatedAt', 'desc'));
+        const rootSnap = await getDocs(qRoot);
+        rootSnap.forEach((d) => {
+          const item = d.data() as SavedReportRecord;
+          const matchKey = item.partitionKey === partitionKey;
+          const matchNames =
+            (item.branchName || item.branch_name || '').trim().toLowerCase() === (session?.branchName || '').trim().toLowerCase() &&
+            (item.officerName || item.officer_name || '').replace(/Kuamar/gi, 'Kumar').trim().toLowerCase() ===
+              (session?.officerName || '').replace(/Kuamar/gi, 'Kumar').trim().toLowerCase();
+
+          if (matchKey || matchNames) {
+            if (!partReports.some((p) => p.id === d.id)) {
+              partReports.push({ ...item, id: d.id, partitionKey });
+            }
+          }
+        });
+      } catch (err) {
+        console.warn('Fallback scan of root reports collection skipped:', err);
+      }
+
+      // Sort by newest updated
+      partReports.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+
+      // Update partition cache
+      setPartitionLocalCache(partitionKey, partReports);
+      return partReports;
+    } catch (err) {
+      console.error('Error fetching partitioned reports, falling back to partition cache:', err);
+      return getPartitionLocalCache(partitionKey);
+    }
+  }
+
+  // 2. Fallback: Fetch all saved reports across all partitions (used when user chooses 'All Reports')
   try {
     const colRef = collection(db, 'saved_reports');
     const q = query(colRef, orderBy('updatedAt', 'desc'));
@@ -115,22 +228,119 @@ export async function fetchAllReports(): Promise<SavedReportRecord[]> {
       });
     });
 
-    // Update local cache
     if (reports.length > 0) {
-      setLocalCache(reports);
-    } else {
-      // If server returned 0 records, check if we have local records to merge
-      const cached = getLocalCache();
-      if (cached.length > 0) {
-        return cached;
-      }
+      localStorage.setItem(GLOBAL_CACHE_KEY, JSON.stringify(reports));
     }
-
     return reports;
   } catch (err) {
     console.error('Failed to fetch reports from Firestore, using offline cache:', err);
     return getLocalCache();
   }
+}
+
+/**
+ * Fetch all reports. Scopes to active officer partition by default to prevent data mixing.
+ */
+export async function fetchAllReports(
+  officerContext?: { branchName?: string; officerName?: string } | null,
+  includeAll = false
+): Promise<SavedReportRecord[]> {
+  return fetchReportsByPartition(officerContext, includeAll);
+}
+
+/**
+ * Real-time subscription to saved reports for the active officer partition
+ */
+export function subscribeToSavedReports(
+  onUpdate: (reports: SavedReportRecord[]) => void,
+  officerContext?: { branchName?: string; officerName?: string } | null,
+  includeAll = false
+): () => void {
+  const session = officerContext || getStoredOfficerSession();
+  const partitionKey = session?.branchName && session?.officerName
+    ? generatePartitionKey(session.branchName, session.officerName)
+    : null;
+
+  // Immediately emit current partition local cache for 0ms UI loading
+  if (!includeAll && partitionKey) {
+    const cached = getPartitionLocalCache(partitionKey);
+    onUpdate(cached);
+  } else {
+    onUpdate(getLocalCache());
+  }
+
+  const unsubscribes: Unsubscribe[] = [];
+
+  // 1. Subscribe to physical partition subcollection if partitionKey is available
+  if (!includeAll && partitionKey) {
+    try {
+      const partCol = collection(db, 'officer_partitions', partitionKey, 'reports');
+      const q = query(partCol, orderBy('updatedAt', 'desc'));
+
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          const reports: SavedReportRecord[] = [];
+          snapshot.forEach((d) => {
+            const data = d.data() as SavedReportRecord;
+            reports.push({
+              ...data,
+              id: d.id,
+              partitionKey
+            });
+          });
+
+          // Also merge any local partition items not yet synced
+          const localPart = getPartitionLocalCache(partitionKey);
+          for (const loc of localPart) {
+            if (!reports.some((r) => r.id === loc.id)) {
+              reports.push(loc);
+            }
+          }
+
+          reports.sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+          setPartitionLocalCache(partitionKey, reports);
+          onUpdate(reports);
+        },
+        (error) => {
+          console.warn('Firestore partition subscription error, using local partition cache:', error);
+          onUpdate(getPartitionLocalCache(partitionKey));
+        }
+      );
+      unsubscribes.push(unsub);
+    } catch (err) {
+      console.error('Failed to setup Firestore partition subscription:', err);
+    }
+  } else {
+    // Root collection subscription
+    try {
+      const colRef = collection(db, 'saved_reports');
+      const q = query(colRef, orderBy('updatedAt', 'desc'));
+      const unsub = onSnapshot(
+        q,
+        (snapshot) => {
+          const reports: SavedReportRecord[] = [];
+          snapshot.forEach((d) => {
+            const data = d.data() as SavedReportRecord;
+            reports.push({ ...data, id: d.id });
+          });
+          localStorage.setItem(GLOBAL_CACHE_KEY, JSON.stringify(reports));
+          onUpdate(reports);
+        },
+        (error) => {
+          console.warn('Firestore subscription error, using local cache:', error);
+          onUpdate(getLocalCache());
+        }
+      );
+      unsubscribes.push(unsub);
+    } catch (err) {
+      console.error('Failed to setup Firestore root subscription:', err);
+    }
+  }
+
+  return () => {
+    unsubscribes.forEach((fn) => fn());
+  };
 }
 
 export class DuplicateReportError extends Error {
@@ -181,7 +391,6 @@ export function extractPhoneNumbers(input?: string): string[] {
   if (!input) return [];
   const numbers: string[] = [];
 
-  // Match 10-digit mobile patterns (\b[6-9]\d{9}\b or any 10 continuous digits)
   const matches = input.match(/(?:(?:\+91|0)?\s*)?([6-9]\d{9})/g);
   if (matches) {
     for (const m of matches) {
@@ -193,7 +402,6 @@ export function extractPhoneNumbers(input?: string): string[] {
     }
   }
 
-  // Also split by common delimiters to catch non-standard numbers
   const parts = input.split(/[,/;\n|&]+/).map((p) => p.trim()).filter(Boolean);
   for (const part of parts) {
     const digits = part.replace(/\D/g, '');
@@ -210,9 +418,11 @@ export function extractPhoneNumbers(input?: string): string[] {
 
 export async function validateReportUniqueness(
   reportData: PDReportData,
-  existingId?: string
+  existingId?: string,
+  officerContext?: { branchName?: string; officerName?: string } | null
 ): Promise<{ isValid: boolean; error?: DuplicateReportError }> {
-  const allRecords = await fetchAllReports();
+  // Validate against both active partition and global records
+  const allRecords = await fetchAllReports(officerContext, true);
   const currentId = existingId?.trim() || '';
 
   // 1. Strict Validation: SKOP Number uniqueness
@@ -269,13 +479,33 @@ export async function validateReportUniqueness(
   return { isValid: true };
 }
 
+// Helper to remove any undefined fields recursively to prevent Firestore validation errors
+function removeUndefined<T>(value: T): T {
+  if (value === undefined || value === null) {
+    return null as any;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => removeUndefined(item)) as any;
+  }
+  if (typeof value === 'object') {
+    const res: Record<string, any> = {};
+    for (const [k, v] of Object.entries(value as Record<string, any>)) {
+      if (v !== undefined) {
+        res[k] = removeUndefined(v);
+      }
+    }
+    return res as T;
+  }
+  return value;
+}
+
 export async function saveReport(
   reportData: PDReportData,
   existingId?: string,
   officerContext?: { branchName?: string; officerName?: string }
 ): Promise<SavedReportRecord> {
   // Enforce strict duplicate validation before saving
-  const validation = await validateReportUniqueness(reportData, existingId);
+  const validation = await validateReportUniqueness(reportData, existingId, officerContext);
   if (!validation.isValid && validation.error) {
     throw validation.error;
   }
@@ -283,7 +513,6 @@ export async function saveReport(
   const now = new Date().toISOString();
   const id = existingId && existingId.trim() ? existingId.trim() : `SKPD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-  // If updating, preserve creation date and original branch/officer if not provided
   let createdAt = now;
   let existingBranch = '';
   let existingOfficer = '';
@@ -302,7 +531,7 @@ export async function saveReport(
     reportData.branch_name ||
     officerContext?.branchName ||
     existingBranch ||
-    ''
+    'Beawar'
   ).trim();
 
   const officerName = (
@@ -311,8 +540,11 @@ export async function saveReport(
     officerContext?.officerName ||
     existingOfficer ||
     reportData.pdAuthorisedPerson ||
-    ''
-  ).trim();
+    'Credit Officer'
+  ).replace(/Kuamar/gi, 'Kumar').trim();
+
+  // Create partition key for isolated storage
+  const partitionKey = generatePartitionKey(branchName, officerName);
 
   const record: SavedReportRecord = {
     id,
@@ -325,6 +557,7 @@ export async function saveReport(
     officerName,
     branch_name: branchName,
     officer_name: officerName,
+    partitionKey,
     createdAt,
     updatedAt: now,
     reportData: {
@@ -335,50 +568,40 @@ export async function saveReport(
       officerName,
       branch_name: branchName,
       officer_name: officerName,
+      partitionKey,
       pdAuthorisedPerson: reportData.pdAuthorisedPerson || officerName || ''
     }
   };
 
-  // Helper to remove any undefined fields recursively to prevent Firestore validation errors
-  function removeUndefined<T>(value: T): T {
-    if (value === undefined || value === null) {
-      return null as any;
-    }
-    if (Array.isArray(value)) {
-      return value.map((item) => removeUndefined(item)) as any;
-    }
-    if (typeof value === 'object') {
-      const res: Record<string, any> = {};
-      for (const [k, v] of Object.entries(value as Record<string, any>)) {
-        if (v !== undefined) {
-          res[k] = removeUndefined(v);
-        }
-      }
-      return res as T;
-    }
-    return value;
-  }
-
-  // 1. Immediately persist to local cache for instant UI response
-  const cached = getLocalCache();
-  const existingIdx = cached.findIndex((r) => r.id === id);
-  let updatedCache: SavedReportRecord[];
-  if (existingIdx >= 0) {
-    updatedCache = [...cached];
-    updatedCache[existingIdx] = record;
+  // 1. Immediately update partition cache and local store for instant offline UI update
+  const partCache = getPartitionLocalCache(partitionKey);
+  const partIdx = partCache.findIndex((r) => r.id === id);
+  let updatedPartCache: SavedReportRecord[];
+  if (partIdx >= 0) {
+    updatedPartCache = [...partCache];
+    updatedPartCache[partIdx] = record;
   } else {
-    updatedCache = [record, ...cached];
+    updatedPartCache = [record, ...partCache];
   }
-  setLocalCache(updatedCache);
+  setLocalCache(updatedPartCache, partitionKey);
 
-  // 2. Persist to Firestore permanent database
+  // 2. Persist to Firestore:
+  // (A) Primary Partition Subcollection: officer_partitions/{partitionKey}/reports/{id}
+  // (B) Global root backup: saved_reports/{id} with partitionKey tag
   try {
-    const docRef = doc(db, 'saved_reports', id);
     const sanitizedRecord = removeUndefined(record);
-    await setDoc(docRef, sanitizedRecord);
+
+    // Save into isolated partition subcollection
+    const partDocRef = doc(db, 'officer_partitions', partitionKey, 'reports', id);
+    const savePartPromise = setDoc(partDocRef, sanitizedRecord);
+
+    // Also backup to root collection
+    const rootDocRef = doc(db, 'saved_reports', id);
+    const saveRootPromise = setDoc(rootDocRef, sanitizedRecord);
+
+    await Promise.allSettled([savePartPromise, saveRootPromise]);
   } catch (err: any) {
     console.error('Failed to save report to Firestore (saved locally):', err);
-    // If Firestore fails due to non-offline errors, propagate so user is alerted
     if (!err?.message?.includes('offline')) {
       throw err;
     }
@@ -387,30 +610,62 @@ export async function saveReport(
   return record;
 }
 
-export async function deleteReport(id: string): Promise<void> {
-  // 1. Remove from local cache
-  const cached = getLocalCache().filter((r) => r.id !== id);
-  setLocalCache(cached);
+export async function deleteReport(
+  id: string,
+  officerContext?: { branchName?: string; officerName?: string },
+  recordPartitionKey?: string
+): Promise<void> {
+  const session = officerContext || getStoredOfficerSession();
+  const partitionKey =
+    recordPartitionKey ||
+    (session?.branchName && session?.officerName ? generatePartitionKey(session.branchName, session.officerName) : null);
 
-  // 2. Remove from Firestore
+  // 1. Remove from local caches
+  if (partitionKey) {
+    const cached = getPartitionLocalCache(partitionKey).filter((r) => r.id !== id);
+    setLocalCache(cached, partitionKey);
+  }
+  const globalCached = getLocalCache().filter((r) => r.id !== id);
+  localStorage.setItem(GLOBAL_CACHE_KEY, JSON.stringify(globalCached));
+
+  // 2. Remove from Firestore: both partition subcollection and root backup
   try {
-    const docRef = doc(db, 'saved_reports', id);
-    await deleteDoc(docRef);
+    const promises: Promise<any>[] = [deleteDoc(doc(db, 'saved_reports', id))];
+    if (partitionKey) {
+      promises.push(deleteDoc(doc(db, 'officer_partitions', partitionKey, 'reports', id)));
+    }
+    await Promise.allSettled(promises);
   } catch (err) {
     console.error('Failed to delete report from Firestore:', err);
   }
 }
 
-export async function duplicateReport(id: string): Promise<SavedReportRecord> {
-  const cached = getLocalCache();
-  let source = cached.find((r) => r.id === id);
+export async function duplicateReport(
+  id: string,
+  officerContext?: { branchName?: string; officerName?: string }
+): Promise<SavedReportRecord> {
+  const session = officerContext || getStoredOfficerSession();
+  const partitionKey = session?.branchName && session?.officerName
+    ? generatePartitionKey(session.branchName, session.officerName)
+    : null;
+
+  let source: SavedReportRecord | undefined;
+  if (partitionKey) {
+    source = getPartitionLocalCache(partitionKey).find((r) => r.id === id);
+  }
+  if (!source) {
+    source = getLocalCache().find((r) => r.id === id);
+  }
 
   if (!source) {
-    // Try fetching from Firestore
     try {
-      const docSnap = await getDoc(doc(db, 'saved_reports', id));
-      if (docSnap.exists()) {
-        source = docSnap.data() as SavedReportRecord;
+      if (partitionKey) {
+        const snap = await getDoc(doc(db, 'officer_partitions', partitionKey, 'reports', id));
+        if (snap.exists()) source = snap.data() as SavedReportRecord;
+      }
+      if (!source) {
+        const rootSnap = await getDoc(doc(db, 'saved_reports', id));
+        if (rootSnap.exists()) source = rootSnap.data() as SavedReportRecord;
       }
     } catch (e) {
       console.error('Failed to fetch source report to duplicate:', e);
@@ -421,18 +676,21 @@ export async function duplicateReport(id: string): Promise<SavedReportRecord> {
     throw new Error('Report to duplicate was not found.');
   }
 
-  // Create duplicate with unique SKOP suffix and cleared contact numbers so it passes uniqueness
   const uniqueSuffix = Date.now().toString().slice(-4);
+  const targetBranch = session?.branchName || source.branchName || source.branch_name || 'Beawar';
+  const targetOfficer = (session?.officerName || source.officerName || source.officer_name || 'Credit Officer').replace(/Kuamar/gi, 'Kumar');
+
   const duplicatedData: PDReportData = {
     ...source.reportData,
     customerName: `${source.reportData.customerName || 'Applicant'} (Copy)`,
     shopNo: source.reportData.shopNo ? `${source.reportData.shopNo}-CP${uniqueSuffix}` : '',
-    contactNumbers: '', // Cleared so it doesn't collide with the original applicant's verified phone
-    branchName: source.branchName || source.branch_name || source.reportData?.branchName || '',
-    officerName: source.officerName || source.officer_name || source.reportData?.officerName || '',
-    branch_name: source.branchName || source.branch_name || source.reportData?.branchName || '',
-    officer_name: source.officerName || source.officer_name || source.reportData?.officerName || '',
+    contactNumbers: '',
+    branchName: targetBranch,
+    officerName: targetOfficer,
+    branch_name: targetBranch,
+    officer_name: targetOfficer,
+    partitionKey: generatePartitionKey(targetBranch, targetOfficer)
   };
 
-  return await saveReport(duplicatedData);
+  return await saveReport(duplicatedData, undefined, { branchName: targetBranch, officerName: targetOfficer });
 }

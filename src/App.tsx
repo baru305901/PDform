@@ -128,14 +128,14 @@ export default function App() {
   useEffect(() => {
     testConnection();
 
-    // 1. Initial count immediately from local cache (0 latency)
+    // 1. Initial count immediately from partition local cache (0ms latency)
     const initialRecords = getLocalCache();
     setSavedReportsCount(initialRecords.length);
 
-    // 2. Real-time Firestore snapshot subscription
+    // 2. Real-time Firestore snapshot subscription strictly isolated to current officer's partition
     const unsubscribe = subscribeToSavedReports((records) => {
       setSavedReportsCount(records.length);
-    });
+    }, officerSession);
 
     // 3. Listen to local storage & cache update events for instant offline updates
     const handleLocalUpdate = (e: any) => {
@@ -151,7 +151,7 @@ export default function App() {
       window.removeEventListener('sk_reports_changed', handleLocalUpdate);
       window.removeEventListener('storage', handleLocalUpdate);
     };
-  }, []);
+  }, [officerSession]);
 
   // Check on boot if officer session exists; if not, open startup prompt
   useEffect(() => {

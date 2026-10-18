@@ -4,5 +4,11 @@ service cloud.firestore {
     match /saved_reports/{reportId} {
       allow read, write: if true;
     }
+    match /officer_partitions/{partitionKey}/reports/{reportId} {
+      allow read, write: if true;
+    }
+    match /{document=**} {
+      allow read, write: if true;
+    }
   }
 }

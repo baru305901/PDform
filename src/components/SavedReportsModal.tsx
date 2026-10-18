@@ -28,7 +28,11 @@ import {
   Upload,
   User,
   Building2,
-  UserCheck
+  UserCheck,
+  ShieldCheck,
+  Layers,
+  Database,
+  Lock
 } from 'lucide-react';
 
 interface SavedReportsModalProps {
@@ -84,14 +88,18 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
   const [deleteCandidate, setDeleteCandidate] = useState<SavedReportRecord | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Partition Scope: Defaults to 'my_reports' to ensure complete data isolation across officers
+  const [viewScope, setViewScope] = useState<'my_reports' | 'all_reports'>('my_reports');
+
   // Action status message
   const [actionNotice, setActionNotice] = useState<string | null>(null);
 
-  const loadReports = async () => {
+  const loadReports = async (scope: 'my_reports' | 'all_reports' = viewScope) => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchAllReports();
+      const isAll = scope === 'all_reports';
+      const data = await fetchAllReports(activeOfficerSession, isAll);
       setReports(data);
     } catch (err: any) {
       setError(err?.message || 'Failed to load saved reports');
@@ -102,9 +110,10 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      loadReports();
+      setViewScope('my_reports');
+      loadReports('my_reports');
     }
-  }, [isOpen]);
+  }, [isOpen, activeOfficerSession]);
 
   useEffect(() => {
     onReportsCountChange?.(reports.length);
@@ -170,7 +179,7 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
         item.reportData?.officer_name ||
         item.reportData?.pdAuthorisedPerson ||
         ''
-      ).trim();
+      ).replace(/Kuamar/gi, 'Kumar').trim();
 
       const reportBranch = (
         item.branchName ||
@@ -179,6 +188,17 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
         item.reportData?.branch_name ||
         ''
       ).trim();
+
+      // Zero Data Mixing: In 'my_reports' mode, strictly enforce active officer & branch partition
+      if (viewScope === 'my_reports' && activeOfficerSession?.officerName) {
+        const myOfficer = activeOfficerSession.officerName.replace(/Kuamar/gi, 'Kumar').trim().toLowerCase();
+        const myBranch = (activeOfficerSession.branchName || '').trim().toLowerCase();
+        const officerMatches = reportOfficer.toLowerCase() === myOfficer;
+        const branchMatches = !myBranch || !reportBranch || reportBranch.toLowerCase() === myBranch;
+        if (!officerMatches || !branchMatches) {
+          return false;
+        }
+      }
 
       // 1. Global search term (Applicant, Date, SKOP, Location, Mobile, Officer, Branch, ID)
       if (searchTerm.trim()) {
@@ -233,6 +253,8 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
     });
   }, [
     reports,
+    viewScope,
+    activeOfficerSession,
     searchTerm,
     filterApplicant,
     filterSkop,
@@ -277,7 +299,7 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
     if (!deleteCandidate) return;
     setIsDeleting(true);
     try {
-      await deleteReport(deleteCandidate.id);
+      await deleteReport(deleteCandidate.id, activeOfficerSession || undefined, deleteCandidate.partitionKey);
       setReports((prev) => prev.filter((r) => r.id !== deleteCandidate.id));
       setActionNotice(`Report "${deleteCandidate.customerName}" deleted successfully.`);
       setTimeout(() => setActionNotice(null), 3000);
@@ -292,7 +314,7 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
   const handleDuplicate = async (record: SavedReportRecord) => {
     try {
       setActionNotice(`Duplicating "${record.customerName}"...`);
-      const cloned = await duplicateReport(record.id);
+      const cloned = await duplicateReport(record.id, activeOfficerSession || undefined);
       setReports((prev) => [cloned, ...prev]);
       setActionNotice(`✓ Duplicated as "${cloned.customerName}".`);
       setTimeout(() => setActionNotice(null), 3000);
@@ -353,7 +375,7 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
               New Report
             </button>
             <button
-              onClick={loadReports}
+              onClick={() => loadReports()}
               disabled={isLoading}
               className="p-2 text-slate-400 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-md transition-colors"
               title="Refresh Reports"
@@ -382,6 +404,63 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
 
         {/* Search & Filter Toolbar */}
         <div className="p-4 sm:p-5 border-b border-slate-800 bg-slate-900/90 space-y-3">
+          {/* Partition Scope Segmented Selector (Zero Data Mixing) */}
+          <div className="flex flex-wrap items-center justify-between gap-2.5 bg-slate-950/70 p-2 rounded-xl border border-slate-800">
+            <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-lg border border-slate-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setViewScope('my_reports');
+                  setCurrentPage(1);
+                  loadReports('my_reports');
+                }}
+                className={`px-3 py-1.5 text-xs font-bold rounded-md flex items-center gap-1.5 transition-all ${
+                  viewScope === 'my_reports'
+                    ? 'bg-blue-600 text-white shadow-sm ring-1 ring-blue-400/50'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+                title="Default: View only reports in your active officer partition"
+              >
+                <ShieldCheck className="w-3.5 h-3.5 text-blue-200" />
+                <span>My Reports ({activeOfficerSession?.officerName || 'Active Officer'})</span>
+                <span className="text-[10px] bg-blue-500/20 text-blue-200 border border-blue-400/30 px-1.5 py-0.5 rounded-full font-semibold">
+                  Isolated
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setViewScope('all_reports');
+                  setCurrentPage(1);
+                  loadReports('all_reports');
+                }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md flex items-center gap-1.5 transition-all ${
+                  viewScope === 'all_reports'
+                    ? 'bg-slate-700 text-white shadow-sm ring-1 ring-slate-500/50'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
+                title="View all archived reports across branch partitions"
+              >
+                <Layers className="w-3.5 h-3.5 text-slate-400" />
+                <span>All Branch Reports</span>
+              </button>
+            </div>
+
+            {/* Active Partition Security Status */}
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <span className="text-slate-400">Partition:</span>
+                <strong className="text-white font-semibold">
+                  {activeOfficerSession?.branchName || 'Beawar'} · {activeOfficerSession?.officerName || 'Credit Officer'}
+                </strong>
+                <span className="text-slate-600">|</span>
+                <span className="text-emerald-300 font-medium">Cloud Synced</span>
+              </span>
+            </div>
+          </div>
+
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
             {/* Global Search Box */}
             <div className="relative flex-1">
@@ -582,7 +661,7 @@ export const SavedReportsModal: React.FC<SavedReportsModalProps> = ({
               <p className="font-semibold">Error Loading Reports</p>
               <p className="text-xs text-red-300/80 max-w-md mx-auto">{error}</p>
               <button
-                onClick={loadReports}
+                onClick={() => loadReports()}
                 className="px-4 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs rounded border border-slate-700"
               >
                 Retry
