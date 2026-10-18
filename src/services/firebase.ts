@@ -349,13 +349,15 @@ export class DuplicateReportError extends Error {
   public conflictingCustomer: string;
   public conflictingReportId: string;
   public conflictingDate?: string;
+  public conflictingRecord?: SavedReportRecord;
 
   constructor(
     field: 'skop' | 'mobile',
     value: string,
     conflictingCustomer: string,
     conflictingReportId: string,
-    conflictingDate?: string
+    conflictingDate?: string,
+    conflictingRecord?: SavedReportRecord
   ) {
     const fieldName = field === 'skop' ? 'SKOP Number' : 'Verified Mobile Number';
     const message = `Duplicate ${fieldName}: "${value}" is already registered for customer "${conflictingCustomer}" (Report ID: ${conflictingReportId}${conflictingDate ? `, Date: ${conflictingDate}` : ''}). Each report must have a unique ${field === 'skop' ? 'SKOP number' : 'verified mobile number'}.`;
@@ -366,7 +368,36 @@ export class DuplicateReportError extends Error {
     this.conflictingCustomer = conflictingCustomer;
     this.conflictingReportId = conflictingReportId;
     this.conflictingDate = conflictingDate;
+    this.conflictingRecord = conflictingRecord;
   }
+}
+
+export function generateUniqueSkop(baseSkop?: string): string {
+  const allRecords = getLocalCache();
+  const existingSkops = new Set<string>();
+  allRecords.forEach((r) => {
+    if (r.shopNo) existingSkops.add(normalizeSkop(r.shopNo));
+    if (r.reportData?.shopNo) existingSkops.add(normalizeSkop(r.reportData.shopNo));
+  });
+
+  if (baseSkop && /^\d+$/.test(baseSkop.trim())) {
+    const num = parseInt(baseSkop.trim(), 10);
+    for (let i = 1; i <= 200; i++) {
+      const candidate = String(num + i);
+      if (!existingSkops.has(candidate)) {
+        return candidate;
+      }
+    }
+  }
+
+  for (let i = 0; i < 100; i++) {
+    const candidate = `4890${Math.floor(1000 + Math.random() * 9000)}`;
+    if (!existingSkops.has(candidate)) {
+      return candidate;
+    }
+  }
+
+  return `4890${Date.now().toString().slice(-4)}`;
 }
 
 export function normalizeSkop(val?: string): string {
@@ -420,7 +451,7 @@ export async function validateReportUniqueness(
   reportData: PDReportData,
   existingId?: string,
   officerContext?: { branchName?: string; officerName?: string } | null
-): Promise<{ isValid: boolean; error?: DuplicateReportError }> {
+): Promise<{ isValid: boolean; error?: DuplicateReportError; conflictingRecord?: SavedReportRecord }> {
   // Validate against both active partition and global records
   const allRecords = await fetchAllReports(officerContext, true);
   const currentId = existingId?.trim() || '';
@@ -438,12 +469,14 @@ export async function validateReportUniqueness(
     if (conflicting) {
       return {
         isValid: false,
+        conflictingRecord: conflicting,
         error: new DuplicateReportError(
           'skop',
           skop,
           conflicting.customerName || conflicting.reportData?.customerName || 'Existing Customer',
           conflicting.id,
-          conflicting.visitDate || conflicting.reportData?.visitDate
+          conflicting.visitDate || conflicting.reportData?.visitDate,
+          conflicting
         )
       };
     }
@@ -464,12 +497,14 @@ export async function validateReportUniqueness(
       if (conflicting) {
         return {
           isValid: false,
+          conflictingRecord: conflicting,
           error: new DuplicateReportError(
             'mobile',
             mobile,
             conflicting.customerName || conflicting.reportData?.customerName || 'Existing Customer',
             conflicting.id,
-            conflicting.visitDate || conflicting.reportData?.visitDate
+            conflicting.visitDate || conflicting.reportData?.visitDate,
+            conflicting
           )
         };
       }
@@ -502,23 +537,48 @@ function removeUndefined<T>(value: T): T {
 export async function saveReport(
   reportData: PDReportData,
   existingId?: string,
-  officerContext?: { branchName?: string; officerName?: string }
+  officerContext?: { branchName?: string; officerName?: string },
+  allowAutoLink: boolean = true
 ): Promise<SavedReportRecord> {
+  let resolvedId = existingId && existingId.trim() ? existingId.trim() : '';
+
+  // If no explicit ID was provided, auto-link to existing report IF the SKOP and customer name match
+  if (!resolvedId && allowAutoLink) {
+    const allRecords = await fetchAllReports(officerContext, true);
+    const skop = (reportData.shopNo || '').trim();
+    const customer = (reportData.customerName || '').trim().toLowerCase();
+
+    if (skop) {
+      const match = allRecords.find((r) => {
+        const otherSkop = (r.shopNo || r.reportData?.shopNo || '').trim();
+        const otherCust = (r.customerName || r.reportData?.customerName || '').trim().toLowerCase();
+        return isSkopMatch(skop, otherSkop) && (
+          otherCust === customer ||
+          (customer.length > 3 && otherCust.includes(customer)) ||
+          (otherCust.length > 3 && customer.includes(otherCust))
+        );
+      });
+      if (match) {
+        resolvedId = match.id;
+      }
+    }
+  }
+
   // Enforce strict duplicate validation before saving
-  const validation = await validateReportUniqueness(reportData, existingId, officerContext);
+  const validation = await validateReportUniqueness(reportData, resolvedId || undefined, officerContext);
   if (!validation.isValid && validation.error) {
     throw validation.error;
   }
 
   const now = new Date().toISOString();
-  const id = existingId && existingId.trim() ? existingId.trim() : `SKPD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  const id = resolvedId || `SKPD-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
   let createdAt = now;
   let existingBranch = '';
   let existingOfficer = '';
-  if (existingId) {
+  if (resolvedId) {
     const cached = getLocalCache();
-    const existing = cached.find((r) => r.id === existingId);
+    const existing = cached.find((r) => r.id === resolvedId);
     if (existing?.createdAt) {
       createdAt = existing.createdAt;
       existingBranch = existing.branchName || existing.branch_name || '';

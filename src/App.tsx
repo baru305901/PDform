@@ -15,7 +15,16 @@ import { SavedReportsModal } from './components/SavedReportsModal';
 import { UploadReportModal } from './components/UploadReportModal';
 import { DuplicateWarningModal, DuplicateAlertInfo } from './components/DuplicateWarningModal';
 import { BranchOfficerModal, OfficerSession, getStoredOfficerSession } from './components/BranchOfficerModal';
-import { saveReport, fetchAllReports, testConnection, DuplicateReportError, subscribeToSavedReports, getLocalCache } from './services/firebase';
+import {
+  saveReport,
+  fetchAllReports,
+  testConnection,
+  DuplicateReportError,
+  subscribeToSavedReports,
+  getLocalCache,
+  isSkopMatch,
+  generateUniqueSkop
+} from './services/firebase';
 import { exportToExcel, exportToWord, exportToJson } from './utils/exportUtils';
 import { CheckCircle, AlertCircle, Info, ChevronRight } from 'lucide-react';
 
@@ -234,37 +243,74 @@ export default function App() {
     }));
   };
 
-  const handleSaveReport = async () => {
+  const handleSaveReport = async (overrideReportId?: string, overrideReportData?: PDReportData) => {
     if (isSaving) return;
     setIsSaving(true);
+    const dataToSave = overrideReportData || reportData;
+    const targetId = overrideReportId !== undefined ? overrideReportId : (currentReportId || undefined);
+
     try {
       const savedRecord = await saveReport(
-        reportData,
-        currentReportId || undefined,
+        dataToSave,
+        targetId,
         officerSession || undefined
       );
       setCurrentReportId(savedRecord.id);
       setIsReportModified(false);
+      setDuplicateAlert(null);
       showToast(
         `✓ Report saved to database! (Tagged: ${savedRecord.officerName || 'Officer'}, ID: ${savedRecord.id})`
       );
     } catch (err: any) {
-      console.error('Error saving report to database:', err);
       if (err instanceof DuplicateReportError || err?.name === 'DuplicateReportError') {
+        console.warn('Duplicate report check triggered:', err.message);
         setDuplicateAlert({
           field: err.field,
           value: err.value,
           conflictingCustomer: err.conflictingCustomer,
           conflictingReportId: err.conflictingReportId,
           conflictingDate: err.conflictingDate,
-          message: err.message
+          message: err.message,
+          conflictingRecord: err.conflictingRecord
         });
-        showToast(`Save blocked: Duplicate ${err.field === 'skop' ? 'SKOP Number' : 'Mobile Number'} detected!`);
+        showToast(`Duplicate ${err.field === 'skop' ? 'SKOP Number' : 'Mobile Number'} detected. Choose how to proceed.`);
       } else {
+        console.error('Error saving report to database:', err);
         showToast(`Failed to save report: ${err?.message || err}`);
       }
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleAutoFixSkop = async () => {
+    const newSkop = generateUniqueSkop(reportData.shopNo);
+    const updatedData = { ...reportData, shopNo: newSkop };
+    setReportData(updatedData);
+    setDuplicateAlert(null);
+    showToast(`✓ Generated fresh unique SKOP: ${newSkop}. Saving report...`);
+    await handleSaveReport(undefined, updatedData);
+  };
+
+  const handleLoadExisting = async (reportId: string) => {
+    const cached = getLocalCache();
+    const existing = cached.find((r) => r.id === reportId);
+    if (existing && existing.reportData) {
+      setReportData(existing.reportData);
+      setCurrentReportId(existing.id);
+      setIsReportModified(false);
+      setDuplicateAlert(null);
+      showToast(`✓ Loaded cloud report (ID: ${existing.id}) for ${existing.customerName}`);
+    } else {
+      const all = await fetchAllReports(officerSession, true);
+      const found = all.find((r) => r.id === reportId);
+      if (found && found.reportData) {
+        setReportData(found.reportData);
+        setCurrentReportId(found.id);
+        setIsReportModified(false);
+        setDuplicateAlert(null);
+        showToast(`✓ Loaded cloud report (ID: ${found.id}) for ${found.customerName}`);
+      }
     }
   };
 
@@ -291,18 +337,20 @@ export default function App() {
         setIsReportModified(false);
         showToast(`✓ Report for "${taggedData.customerName || 'Applicant'}" uploaded and saved! (ID: ${savedRecord.id})`);
       } catch (err: any) {
-        console.error('Error saving uploaded report:', err);
         if (err instanceof DuplicateReportError || err?.name === 'DuplicateReportError') {
+          console.warn('Duplicate report check triggered during upload:', err.message);
           setDuplicateAlert({
             field: err.field,
             value: err.value,
             conflictingCustomer: err.conflictingCustomer,
             conflictingReportId: err.conflictingReportId,
             conflictingDate: err.conflictingDate,
-            message: err.message
+            message: err.message,
+            conflictingRecord: err.conflictingRecord
           });
           showToast(`Report loaded into form, but database save was blocked: Duplicate ${err.field === 'skop' ? 'SKOP' : 'Mobile'} detected.`);
         } else {
+          console.error('Error saving uploaded report:', err);
           showToast(`Report loaded into form, but database save failed: ${err?.message || err}`);
         }
       } finally {
@@ -449,15 +497,22 @@ export default function App() {
       const confirm = window.confirm('You have unsaved changes. Discard and load sample report?');
       if (!confirm) return;
     }
-    setCurrentReportId(null);
+    setDuplicateAlert(null);
     setIsReportModified(false);
+
+    const cached = getLocalCache();
     if (sampleType === 'kulwant') {
+      const existing = cached.find((r) => isSkopMatch(r.shopNo, sampleKulwantSingh.shopNo));
+      setCurrentReportId(existing ? existing.id : null);
       setReportData(sampleKulwantSingh);
       showToast('Loaded Sample: Kulwant Singh (Beawar)');
     } else if (sampleType === 'rajesh') {
+      const existing = cached.find((r) => isSkopMatch(r.shopNo, sampleRajeshSharma.shopNo));
+      setCurrentReportId(existing ? existing.id : null);
       setReportData(sampleRajeshSharma);
       showToast('Loaded Sample: Rajesh Sharma (Jaipur)');
     } else {
+      setCurrentReportId(null);
       setReportData(blankReport);
       showToast('Loaded Blank Form Template');
     }
@@ -812,6 +867,9 @@ export default function App() {
           setDuplicateAlert(null);
           setIsSavedReportsModalOpen(true);
         }}
+        onUpdateExisting={(reportId) => handleSaveReport(reportId)}
+        onAutoFixSkop={handleAutoFixSkop}
+        onLoadExisting={handleLoadExisting}
       />
 
       {/* Lightweight Branch & Officer Entry Modal (Startup, New Sheet, or Switch) */}
