@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { PDReportData, FamilyMember, SavedReportRecord } from './types';
-import { sampleKulwantSingh, sampleRajeshSharma, blankReport, createFreshBlankReport } from './sampleData';
+import { blankReport, createFreshBlankReport } from './sampleData';
 import { HeaderBar } from './components/HeaderBar';
 import { Page1Report } from './components/Page1Report';
 import { Page2Report } from './components/Page2Report';
@@ -78,7 +78,6 @@ export default function App() {
   });
 
   const [zoom, setZoom] = useState<number>(1.0);
-  const [fontMode, setFontMode] = useState<'script' | 'formal'>('script');
   const [viewMode, setViewMode] = useState<'continuous' | 'p1' | 'p2' | 'p3' | 'split'>('continuous');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -531,48 +530,6 @@ export default function App() {
     showToast('Logged out successfully. All form fields reset to clean slate.');
   };
 
-  const handleLoadSample = (sampleType: 'kulwant' | 'rajesh' | 'blank') => {
-    if (isReportModified) {
-      const confirm = window.confirm('You have unsaved changes. Discard and load sample report?');
-      if (!confirm) return;
-    }
-    setDuplicateAlert(null);
-    setIsReportModified(false);
-
-    const cached = getLocalCache();
-    if (sampleType === 'kulwant') {
-      const existing = cached.find((r) => isSkopMatch(r.shopNo, sampleKulwantSingh.shopNo));
-      setCurrentReportId(existing ? existing.id : null);
-      setReportData(sampleKulwantSingh);
-      showToast('Loaded Sample: Kulwant Singh (Beawar)');
-    } else if (sampleType === 'rajesh') {
-      const existing = cached.find((r) => isSkopMatch(r.shopNo, sampleRajeshSharma.shopNo));
-      setCurrentReportId(existing ? existing.id : null);
-      setReportData(sampleRajeshSharma);
-      showToast('Loaded Sample: Rajesh Sharma (Jaipur)');
-    } else {
-      setCurrentReportId(null);
-      setReportData(createFreshBlankReport(officerSession));
-      showToast('Loaded Blank Form Template');
-    }
-  };
-
-  const handleClear = () => {
-    if (window.confirm('Are you sure you want to clear all form fields?')) {
-      setReportData(createFreshBlankReport(officerSession));
-      setCurrentReportId(null);
-      setIsReportModified(false);
-      setDuplicateAlert(null);
-      try {
-        localStorage.removeItem(STORAGE_KEY);
-        localStorage.removeItem(ACTIVE_REPORT_ID_KEY);
-      } catch {
-        // ignore
-      }
-      showToast('All fields cleared to fresh blank sheet');
-    }
-  };
-
   const handleExportExcel = () => {
     const res = exportToExcel(reportData);
     showToast(res.message);
@@ -635,11 +592,9 @@ export default function App() {
   ).length;
 
   return (
-    <div className={`min-h-screen bg-slate-700 ${fontMode === 'script' ? 'font-script-mode' : ''}`}>
+    <div className="min-h-screen bg-slate-700">
       {/* Top Header Bar */}
       <HeaderBar
-        onLoadSample={handleLoadSample}
-        onClear={handleClear}
         onExportExcel={handleExportExcel}
         onExportWord={handleExportWord}
         onExportJson={handleExportJson}
@@ -647,8 +602,6 @@ export default function App() {
         zoom={zoom}
         setZoom={setZoom}
         onFitToWidth={handleFitToWidth}
-        fontMode={fontMode}
-        setFontMode={setFontMode}
         viewMode={viewMode}
         setViewMode={setViewMode}
         reportData={reportData}

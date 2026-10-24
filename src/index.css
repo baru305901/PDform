@@ -126,18 +126,9 @@ body {
 }
 
 .handwritten {
+  font-family: 'Inter', Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   font-weight: 600;
-  color: #0d2850;
-}
-
-.font-script-mode .handwritten,
-.font-script-mode .form-input,
-.font-script-mode .form-textarea {
-  font-family: 'Caveat', cursive, sans-serif;
-  font-size: 13.5px;
-  line-height: 1.15;
-  color: #0c2d6b;
-  letter-spacing: 0.2px;
+  color: #0f2b5c;
 }
 
 /* Hole punch visual simulation (screen only) */

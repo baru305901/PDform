@@ -96,7 +96,7 @@ export const SignatureModal: React.FC<SignatureModalProps> = ({
     if (!ctx) return '';
 
     ctx.clearRect(0, 0, canvas.width, canvas.height);
-    ctx.font = '36px "Caveat", cursive, sans-serif';
+    ctx.font = 'bold 22px "Inter", "Roboto", sans-serif';
     ctx.fillStyle = inkColor;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -235,8 +235,8 @@ export const SignatureModal: React.FC<SignatureModalProps> = ({
               <div className="border border-slate-200 rounded-lg p-4 bg-slate-50 text-center">
                 <p className="text-[11px] text-slate-400 mb-1 font-medium">Signature Preview</p>
                 <p
-                  className="text-3xl font-script tracking-wider"
-                  style={{ fontFamily: 'Caveat, cursive', color: inkColor }}
+                  className="text-xl font-bold tracking-wider"
+                  style={{ fontFamily: "'Inter', 'Roboto', sans-serif", color: inkColor }}
                 >
                   {typedName || 'Your Signature'}
                 </p>

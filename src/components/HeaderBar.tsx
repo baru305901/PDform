@@ -3,15 +3,11 @@ import {
   Printer,
   FileSpreadsheet,
   FileText,
-  RotateCcw,
-  Sparkles,
   Download,
   Upload,
   ZoomIn,
   ZoomOut,
   Maximize2,
-  PenTool,
-  Type,
   Save,
   FolderArchive,
   Check,
@@ -26,8 +22,6 @@ import {
 import { PDReportData } from '../types';
 
 interface HeaderBarProps {
-  onLoadSample: (sampleType: 'kulwant' | 'rajesh' | 'blank') => void;
-  onClear: () => void;
   onExportExcel: () => void;
   onExportWord: () => void;
   onExportJson: () => void;
@@ -35,8 +29,6 @@ interface HeaderBarProps {
   zoom: number;
   setZoom: (z: number) => void;
   onFitToWidth?: () => void;
-  fontMode: 'script' | 'formal';
-  setFontMode: (m: 'script' | 'formal') => void;
   viewMode: 'continuous' | 'p1' | 'p2' | 'p3' | 'split';
   setViewMode: (v: 'continuous' | 'p1' | 'p2' | 'p3' | 'split') => void;
   reportData: PDReportData;
@@ -57,8 +49,6 @@ interface HeaderBarProps {
 }
 
 export const HeaderBar: React.FC<HeaderBarProps> = ({
-  onLoadSample,
-  onClear,
   onExportExcel,
   onExportWord,
   onExportJson,
@@ -66,8 +56,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
   zoom,
   setZoom,
   onFitToWidth,
-  fontMode,
-  setFontMode,
   viewMode,
   setViewMode,
   reportData,
@@ -190,12 +178,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
                 {zoom < 0.95 ? '100%' : 'Fit'}
               </button>
             )}
-            <button
-              onClick={() => onLoadSample('kulwant')}
-              className="text-xs bg-slate-800 text-amber-300 px-2 py-1 rounded font-medium border border-amber-500/30"
-            >
-              Sample
-            </button>
             <button
               onClick={handlePrint}
               className="text-xs bg-indigo-600 text-white px-2.5 py-1 rounded font-bold"
@@ -356,77 +338,6 @@ export const HeaderBar: React.FC<HeaderBarProps> = ({
               )}
             </div>
           )}
-
-          {/* Preset Samples */}
-          <div className="relative inline-block text-left group">
-            <button
-              type="button"
-              className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-amber-300 border border-amber-500/40 text-xs font-semibold shadow-xs transition active:scale-95"
-            >
-              <Sparkles className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">Load Sample</span>
-            </button>
-            <div className="absolute left-0 sm:right-0 mt-1 w-56 origin-top-right rounded-lg bg-slate-800 border border-slate-700 shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-150 z-50 p-1">
-              <button
-                type="button"
-                onClick={() => onLoadSample('kulwant')}
-                className="w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:text-amber-300 rounded-md transition"
-              >
-                <div className="font-semibold">Kulwant Singh (Beawar)</div>
-                <div className="text-[10px] text-slate-400">Driving School, GP Patta, 9 Members</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => onLoadSample('rajesh')}
-                className="w-full text-left px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-700 hover:text-amber-300 rounded-md transition border-t border-slate-700/60"
-              >
-                <div className="font-semibold">Rajesh Sharma (Jaipur)</div>
-                <div className="text-[10px] text-slate-400">Provision Store, Urban, Perfect CIBIL</div>
-              </button>
-              <button
-                type="button"
-                onClick={() => onLoadSample('blank')}
-                className="w-full text-left px-3 py-2 text-xs font-medium text-slate-400 hover:bg-slate-700 hover:text-white rounded-md transition border-t border-slate-700/60"
-              >
-                Blank Form Template
-              </button>
-            </div>
-          </div>
-
-          {/* Clear Button */}
-          <button
-            onClick={onClear}
-            type="button"
-            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-600 text-xs font-semibold shadow-xs transition active:scale-95"
-            title="Clear all fields"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Clear</span>
-          </button>
-
-          {/* Font Stylist Toggle */}
-          <button
-            onClick={() => setFontMode(fontMode === 'script' ? 'formal' : 'script')}
-            type="button"
-            className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-md border text-xs font-semibold shadow-xs transition active:scale-95 ${
-              fontMode === 'script'
-                ? 'bg-blue-950/80 border-blue-500/60 text-blue-300'
-                : 'bg-slate-800 border-slate-600 text-slate-300'
-            }`}
-            title="Toggle between field pen handwriting style and formal digital type"
-          >
-            {fontMode === 'script' ? (
-              <>
-                <PenTool className="w-3.5 h-3.5 text-blue-400" />
-                <span className="hidden md:inline">Pen Script</span>
-              </>
-            ) : (
-              <>
-                <Type className="w-3.5 h-3.5" />
-                <span className="hidden md:inline">Formal Type</span>
-              </>
-            )}
-          </button>
 
           {/* Zoom controls */}
           <div className="hidden sm:flex items-center bg-slate-800 border border-slate-700 rounded-md p-0.5">
